@@ -3,7 +3,7 @@ import Layout from '../components/Layout'
 
 const IndexPage = () => (
   <Layout title="Home | Next.js + TypeScript Example" meta="Home Page">
-    <h1>Hello Next.js 1234567 👋</h1>
+    <h1>Hello Next.js 12345678 👋</h1>
     <p>
       <Link href="/about">
         <a>About</a>
