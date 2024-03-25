@@ -1,3 +1,10 @@
+---
+layout: ../layouts/Layout.astro
+title: Astro in brief
+author: Maratib
+description: Find out what makes Astro awesome!
+---
+
 # Adding PWA to Vue3
 
 ```bash
