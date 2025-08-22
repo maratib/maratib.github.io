@@ -4,14 +4,21 @@ import starlight from "@astrojs/starlight";
 import tailwindcss from "@tailwindcss/vite";
 import starlightBlog from "starlight-blog";
 import starlightLinksValidator from "starlight-links-validator";
+import mermaid from "astro-mermaid";
 
 const site = "http://localhost:4322";
 // https://astro.build/config
 export default defineConfig({
   site,
   integrations: [
+    mermaid(),
     starlight({
       title: "maratib",
+      favicon: "favicon.ico",
+      logo: {
+        src: "./src/assets/houston.webp",
+        alt: "Maratib Ali Khan",
+      },
       social: [
         {
           icon: "linkedin",
