@@ -1,22 +1,21 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
-import tailwindcss from "@tailwindcss/vite";
+import starlightThemeGalaxy from "starlight-theme-galaxy";
+
 import starlightBlog from "starlight-blog";
 import starlightLinksValidator from "starlight-links-validator";
 import mermaid from "astro-mermaid";
 
-const site = "http://localhost:4322";
 // https://astro.build/config
 export default defineConfig({
-  site,
   integrations: [
     mermaid(),
     starlight({
       title: "maratib",
       favicon: "favicon.ico",
       logo: {
-        src: "./src/assets/houston.webp",
+        src: "./src/assets/img/houston.webp",
         alt: "Maratib Ali Khan",
       },
       social: [
@@ -34,18 +33,23 @@ export default defineConfig({
       ],
       sidebar: [
         {
-          label: "Guides",
-          items: [
-            // Each item here is one entry in the navigation menu.
-            { label: "Example Guide", slug: "guides/example" },
-          ],
+          label: "Flutter",
+          collapsed: true,
+          autogenerate: { directory: "flutter" },
         },
         {
-          label: "Reference",
-          autogenerate: { directory: "reference" },
+          label: "React",
+          collapsed: true,
+          autogenerate: { directory: "react" },
+        },
+        {
+          label: "Starlight",
+          collapsed: true,
+          autogenerate: { directory: "starlight", collapsed: true },
         },
       ],
       plugins: [
+        starlightThemeGalaxy(),
         starlightBlog({
           metrics: { readingTime: true, words: false },
           authors: {
@@ -67,13 +71,6 @@ export default defineConfig({
           ],
         }),
       ],
-      customCss: [
-        "./src/assets/global.css",
-        // ,"./src/assets/landing.css"
-      ],
     }),
   ],
-  vite: {
-    plugins: [tailwindcss()],
-  },
 });

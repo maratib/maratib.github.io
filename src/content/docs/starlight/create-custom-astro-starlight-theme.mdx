@@ -1,0 +1,240 @@
+---
+title: Create Custom Astro Starlight Theme
+description: A guide on how to create a custom theme for Astro Starlight.
+date: 2025-08-02
+tags:
+  - community
+---
+ 
+Starlight is a documentation theme for Astro that's highly customizable. Here's how to create your own custom theme:
+
+## 1. Installation and Setup
+
+First, create a new Starlight project:
+
+```bash
+npm create astro@latest -- --template starlight
+```
+
+## 2. Basic Configuration
+
+Update your `astro.config.mjs` to customize the theme:
+
+```javascript
+// astro.config.mjs
+import { defineConfig } from 'astro/config';
+import starlight from '@astrojs/starlight';
+
+export default defineConfig({
+  integrations: [
+    starlight({
+      title: 'My Documentation',
+      // Theme customization
+      customCss: ['./src/styles/custom.css'],
+      components: {
+        // Override default components
+        Header: './src/components/CustomHeader.astro',
+        Sidebar: './src/components/CustomSidebar.astro',
+      },
+      // Theme colors
+      colors: {
+        primary: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9', // Your primary color
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c4a6e',
+        },
+      },
+    }),
+  ],
+});
+```
+
+## 3. Custom CSS Styles
+
+Create a custom CSS file at `src/styles/custom.css`:
+
+```css
+/* src/styles/custom.css */
+:root {
+  /* Custom properties */
+  --sl-font: 'Inter', sans-serif;
+  --sl-font-mono: 'Fira Code', monospace;
+}
+
+/* Custom header styles */
+.sl-container {
+  max-width: 1200px;
+}
+
+/* Custom button styles */
+.sl-button {
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+/* Dark mode adjustments */
+[data-theme='dark'] {
+  --sl-color-accent-low: #0c4a6e;
+  --sl-color-accent: #0ea5e9;
+  --sl-color-accent-high: #7dd3fc;
+}
+```
+
+## 4. Custom Components
+
+Create custom components to override default Starlight components:
+
+```astro
+<!-- src/components/CustomHeader.astro -->
+---
+import Header from '@astrojs/starlight/components/Header.astro';
+---
+
+<Header>
+  <!-- Add your custom logo -->
+  <div slot="logo">
+    <img src="/logo.svg" alt="My Logo" width="40" height="40" />
+    <span>My Docs</span>
+  </div>
+</Header>
+
+<style>
+  :global(header) {
+    border-bottom: 2px solid var(--sl-color-accent);
+  }
+</style>
+```
+
+## 5. Custom Layout
+
+Create a custom layout component:
+
+```astro
+<!-- src/components/CustomLayout.astro -->
+---
+import BaseLayout from '@astrojs/starlight/layouts/BaseLayout.astro';
+---
+
+<BaseLayout>
+  <!-- Add custom content before main content -->
+  <div slot="header">
+    <div class="announcement-banner">
+      🎉 New features available! Check out our latest update.
+    </div>
+  </div>
+
+  <!-- Add custom content after main content -->
+  <div slot="footer">
+    <footer class="custom-footer">
+      <p>Built with Starlight & Astro</p>
+    </footer>
+  </div>
+</BaseLayout>
+
+<style>
+  .announcement-banner {
+    background: var(--sl-color-accent);
+    color: white;
+    text-align: center;
+    padding: 0.5rem;
+    font-weight: 500;
+  }
+
+  .custom-footer {
+    text-align: center;
+    padding: 2rem;
+    margin-top: 3rem;
+    border-top: 1px solid var(--sl-color-gray-200);
+  }
+</style>
+```
+
+## 6. Theme Configuration in astro.config.mjs
+
+Extend your theme configuration:
+
+```javascript
+// astro.config.mjs
+starlight({
+  // ... other config
+  social: {
+    github: 'https://github.com/yourusername/yourrepo',
+    twitter: 'https://twitter.com/yourusername',
+  },
+  sidebar: [
+    {
+      label: 'Guides',
+      items: [
+        { label: 'Getting Started', link: '/guides/getting-started' },
+        { label: 'Advanced Usage', link: '/guides/advanced-usage' },
+      ],
+    },
+    {
+      label: 'Reference',
+      autogenerate: { directory: 'reference' },
+    },
+  ],
+  favicon: '/favicon.ico',
+  logo: {
+    src: './src/assets/logo.png',
+    alt: 'My Company Logo',
+  },
+});
+```
+
+## 7. Custom Fonts
+
+Add custom fonts by including them in your layout:
+
+```astro
+<!-- src/components/Layout.astro -->
+---
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/700.css';
+import '@fontsource/fira-code/400.css';
+---
+
+<head>
+  <!-- Add to the head -->
+</head>
+```
+
+## 8. Complete Example Structure
+
+```
+src/
+├── components/
+│   ├── CustomHeader.astro
+│   ├── CustomSidebar.astro
+│   └── CustomLayout.astro
+├── styles/
+│   └── custom.css
+├── content/
+│   ├── config.ts
+│   └── docs/
+└── pages/
+```
+
+## 9. Build and Test
+
+```bash
+npm run dev
+# or
+npm run build
+```
+
+## Additional Tips
+
+1. **Use CSS Variables**: Starlight exposes many CSS custom properties you can override
+2. **Component Slots**: Many Starlight components have slots for customization
+3. **Dark Mode**: Remember to test both light and dark themes
+4. **Responsive Design**: Ensure your theme works on mobile devices
+
+This approach gives you complete control over the appearance while maintaining all the functionality of Starlight. You can customize colors, typography, layout, and even replace entire components with your own implementations.
