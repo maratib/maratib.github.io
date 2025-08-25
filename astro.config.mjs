@@ -49,7 +49,34 @@ export default defineConfig({
         {
           label: "React Native",
           collapsed: true,
-          autogenerate: { directory: "guides/react-native" },
+          items: [
+            {
+              label: "React Native Learning Course",
+              link: "guides/react-native/react-native-learning-course",
+            },
+            {
+              label: "Setting up development environment",
+              link: "guides/react-native/setup-development-environment",
+            },
+            {
+              label: "Creating our first project",
+              link: "guides/react-native/create-our-first-project",
+            },
+            {
+              label: "Navigation Options",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/react-native/navigation-options",
+              },
+            },
+            {
+              label: "Tips and Tricks",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/react-native/tips-and-tricks",
+              },
+            },
+          ],
         },
         {
           label: "Starlight",

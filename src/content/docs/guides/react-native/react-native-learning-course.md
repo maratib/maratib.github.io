@@ -1,6 +1,6 @@
 ---
 title: React Native Learning Course
-slug: react-native-learning-course
+slug: guides/react-native/react-native-learning-course
 description: Learn React Native 54 with latest and greatest features
 sidebar:
   order: 0

@@ -1,6 +1,6 @@
 ---
 title: Creating our first project
-slug: create-our-first-project
+slug: guides/react-native/create-our-first-project
 description: Setting up development environment for ReactNative
 sidebar:
   order: 2

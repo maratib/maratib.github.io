@@ -10,6 +10,7 @@ Let's remove the annoying ripple effect from Tabs for Android.
 
 ```javascript
 //In your TabLayout
+import { PlatformPressable } from '@react-navigation/elements';
 
  screenOptions={{
     ...
