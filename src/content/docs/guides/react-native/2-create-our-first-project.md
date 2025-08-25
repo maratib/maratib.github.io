@@ -6,8 +6,9 @@ sidebar:
   order: 2
 ---
 
-Let's create our first project
-[rn.new for more details](https://rn.new/)
+Let's create our first project.
+
+[rn.new](https://rn.new/) for more details
 
 ### To create latest version of expo
 
