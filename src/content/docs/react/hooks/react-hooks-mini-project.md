@@ -1,5 +1,6 @@
 ---
 title: React Hooks Mini Project
+slug: react-hooks-mini-project
 description: React Hooks Mini Project
 date: 2024-06-02
 author: maratib
@@ -7,15 +8,9 @@ featured: true
 order: 4
 ---
 
----
+## Project Overview: User Finder with Theme Toggle
 
-Great! Let’s turn the cheat sheet into a **mini React 19 + TypeScript project** that uses multiple hooks together. We’ll keep it **simple but practical** so a beginner can understand and grow from it.
-
----
-
-## **Project Overview: User Finder with Theme Toggle**
-
-### **Features**
+### Features
 
 - Fetch and display a list of users (API call) – `useFetch`.
 - Search users with debounce – `useDebounce`.
@@ -23,9 +18,7 @@ Great! Let’s turn the cheat sheet into a **mini React 19 + TypeScript project*
 - Show previous search term – `usePrevious`.
 - All written in **React 19 + TypeScript** with **function components**.
 
----
-
-## **Folder Structure**
+## Folder Structure
 
 ```
 src/
@@ -44,9 +37,9 @@ src/
 
 ---
 
-## **Step 1: Hooks**
+## Step 1: Hooks
 
-### **hooks/useFetch.ts**
+### hooks/useFetch.ts
 
 ```tsx
 import { useState, useEffect } from "react";
@@ -82,7 +75,7 @@ export function useFetch<T = unknown>(url: string) {
 
 ---
 
-### **hooks/useDebounce.ts**
+### hooks/useDebounce.ts
 
 ```tsx
 import { useState, useEffect } from "react";
@@ -101,7 +94,7 @@ export function useDebounce<T>(value: T, delay: number) {
 
 ---
 
-### **hooks/useLocalStorage.ts**
+### hooks/useLocalStorage.ts
 
 ```tsx
 import { useState, useEffect } from "react";
@@ -122,7 +115,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 
 ---
 
-### **hooks/usePrevious.ts**
+### hooks/usePrevious.ts
 
 ```tsx
 import { useEffect, useRef } from "react";
@@ -138,9 +131,9 @@ export function usePrevious<T>(value: T) {
 
 ---
 
-## **Step 2: Components**
+## Step 2: Components
 
-### **components/ThemeToggle.tsx**
+### components/ThemeToggle.tsx
 
 ```tsx
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -166,7 +159,7 @@ export function ThemeToggle() {
 
 ---
 
-### **components/SearchInput.tsx**
+### components/SearchInput.tsx
 
 ```tsx
 import { useState, ChangeEvent } from "react";
@@ -206,7 +199,7 @@ export function SearchInput({ onSearch }: SearchInputProps) {
 
 ---
 
-### **components/UserList.tsx**
+### components/UserList.tsx
 
 ```tsx
 interface User {
@@ -236,7 +229,7 @@ export function UserList({ users }: UserListProps) {
 
 ---
 
-## **Step 3: App.tsx**
+## Step 3: App.tsx
 
 ```tsx
 import React from "react";
@@ -278,7 +271,7 @@ export default function App() {
 
 ---
 
-## **Step 4: Run It**
+## Step 4: Run It
 
 1. **Create project**:
 
@@ -294,7 +287,7 @@ export default function App() {
    npm start
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) to see:
+4. Open `http://localhost:3000` to see:
 
    - Theme toggle button.
    - Search bar with debounce and previous search display.
@@ -302,11 +295,9 @@ export default function App() {
 
 ---
 
-## **What You Learned**
+## What You Learned
 
 - Combining multiple hooks in a real scenario.
 - Type safety with TypeScript.
 - Logic separation using custom hooks.
 - Clean component structure.
-
----
