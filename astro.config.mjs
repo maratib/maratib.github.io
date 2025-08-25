@@ -47,6 +47,11 @@ export default defineConfig({
           autogenerate: { directory: "guides/react" },
         },
         {
+          label: "React Native",
+          collapsed: true,
+          autogenerate: { directory: "guides/react-native" },
+        },
+        {
           label: "Starlight",
           collapsed: true,
           autogenerate: { directory: "guides/starlight", collapsed: true },
