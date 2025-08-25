@@ -5,7 +5,8 @@ description: Learn React 19 latest and greatest features
 date: 2025-08-02
 author: maratib
 featured: true
-order: 1
+sidebar:
+  order: 0
 ---
 
 Guides lead a user through a specific task they want to accomplish, often with a sequence of steps.

@@ -4,7 +4,8 @@ description: Custom React hooks
 date: 2025-08-02
 author: maratib
 featured: true
-order: 2
+sidebar:
+  order: 2
 ---
 
 ## 1. What Are Hooks in React 19?

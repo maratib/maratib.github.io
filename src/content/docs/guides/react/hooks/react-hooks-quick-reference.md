@@ -4,7 +4,8 @@ description: React Hooks Quick Reference
 date: 2025-08-02
 author: maratib
 featured: true
-order: 3
+sidebar:
+  order: 4
 ---
 
 ---

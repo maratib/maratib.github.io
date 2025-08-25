@@ -4,7 +4,8 @@ description: All about React hooks.
 date: 2024-08-02
 author: maratib
 featured: true
-order: 1
+sidebar:
+  order: 1
 ---
 
 ## 1. What Are Hooks?

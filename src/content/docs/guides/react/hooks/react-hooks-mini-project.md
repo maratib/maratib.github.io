@@ -5,7 +5,8 @@ description: React Hooks Mini Project
 date: 2024-06-02
 author: maratib
 featured: true
-order: 4
+sidebar:
+  order: 3
 ---
 
 ## Project Overview: User Finder with Theme Toggle

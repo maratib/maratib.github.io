@@ -33,19 +33,23 @@ export default defineConfig({
       ],
       sidebar: [
         {
+          label: "Courses",
+          link: "/guides/courses",
+        },
+        {
           label: "Flutter",
           collapsed: true,
-          autogenerate: { directory: "flutter" },
+          autogenerate: { directory: "guides/flutter" },
         },
         {
           label: "React",
           collapsed: true,
-          autogenerate: { directory: "react" },
+          autogenerate: { directory: "guides/react" },
         },
         {
           label: "Starlight",
           collapsed: true,
-          autogenerate: { directory: "starlight", collapsed: true },
+          autogenerate: { directory: "guides/starlight", collapsed: true },
         },
       ],
       plugins: [
