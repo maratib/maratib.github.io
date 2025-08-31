@@ -1,0 +1,30 @@
+/* Link color on hover */
+
+
+.itemContainer {
+    margin-top: 2em;
+    margin-bottom: 20px;
+
+
+    a {
+        color: #a6b8ff;
+        font-size: 1.5em;
+        font-weight: bold;
+        margin-bottom: 0.3em;
+        margin-top: 2em;
+        display: block;
+    }
+
+    a:hover {
+        color: rgb(152, 152, 253);
+    }
+
+    i {
+        color: #a6b8ff;
+        font-size: 16px;
+
+    }
+
+
+
+}

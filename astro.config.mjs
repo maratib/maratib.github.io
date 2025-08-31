@@ -14,6 +14,7 @@ export default defineConfig({
     starlight({
       title: "maratib",
       favicon: "favicon.ico",
+      customCss: ['./src/assets/css/styles.scss'],
       logo: {
         src: "./src/assets/img/houston.webp",
         alt: "Maratib Ali Khan",

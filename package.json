@@ -20,6 +20,7 @@
     "starlight-theme-galaxy": "^0.2.0"
   },
   "devDependencies": {
+    "sass": "^1.91.0",
     "starlight-links-validator": "^0.17.1"
   }
 }
