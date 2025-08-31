@@ -56,12 +56,16 @@ export default defineConfig({
               link: "guides/react-native/react-native-learning-course",
             },
             {
-              label: "Setting up development environment",
+              label: "Setting up dev environment",
               link: "guides/react-native/setup-development-environment",
             },
             {
-              label: "Creating our first project",
-              link: "guides/react-native/create-our-first-project",
+              label: "Creating our first Expo project",
+              link: "guides/react-native/create-our-first-expo-project",
+            },
+            {
+              label: "Creating our first Cli project",
+              link: "guides/react-native/create-our-first-cli-project",
             },
             {
               label: "Navigation Options",
