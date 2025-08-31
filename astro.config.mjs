@@ -53,6 +53,11 @@ export default defineConfig({
           autogenerate: { directory: "guides/api" },
         },
         {
+          label: "Spring Boot",
+          collapsed: true,
+          autogenerate: { directory: "guides/spring-boot" },
+        },
+        {
           label: "Flutter",
           collapsed: true,
           autogenerate: { directory: "guides/flutter" },
