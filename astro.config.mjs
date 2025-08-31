@@ -38,6 +38,16 @@ export default defineConfig({
           link: "/guides/courses",
         },
         {
+          label: "J2EE",
+          collapsed: true,
+          autogenerate: { directory: "guides/j2ee" },
+        },
+        {
+          label: "Microservices",
+          collapsed: true,
+          autogenerate: { directory: "guides/microservices" },
+        },
+        {
           label: "Flutter",
           collapsed: true,
           autogenerate: { directory: "guides/flutter" },
