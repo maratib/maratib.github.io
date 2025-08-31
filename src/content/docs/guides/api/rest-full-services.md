@@ -1,6 +1,6 @@
 ---
 title: RESTful Web Services
-slug: guides/microservices/rest-full-services
+slug: guides/api/rest-full-services
 description: RESTful Web Services
 sidebar:
   order: 0

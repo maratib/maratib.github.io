@@ -38,14 +38,19 @@ export default defineConfig({
           link: "/guides/courses",
         },
         {
+          label: "Java",
+          collapsed: true,
+          autogenerate: { directory: "guides/java" },
+        },
+        {
           label: "J2EE",
           collapsed: true,
           autogenerate: { directory: "guides/j2ee" },
         },
         {
-          label: "Microservices",
+          label: "APIs",
           collapsed: true,
-          autogenerate: { directory: "guides/microservices" },
+          autogenerate: { directory: "guides/api" },
         },
         {
           label: "Flutter",
