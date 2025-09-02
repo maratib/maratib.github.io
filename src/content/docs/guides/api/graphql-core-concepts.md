@@ -10,7 +10,7 @@ sidebar:
 - **GraphQL** is a **query language for APIs**, developed by Facebook
 - It solves the pain points of **REST**, like `over-fetching` or `under-fetching`
 
-It can be divided into 4 parts :-
+It can be divided into four parts :-
 1. **Schema** - GraphQL Blueprint
 2. **Queries** - Fetching Data
 3. **Mutations** - Create, Update, Delete (***CUD***)
