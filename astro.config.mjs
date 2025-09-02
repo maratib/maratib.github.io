@@ -5,6 +5,7 @@ import starlightThemeGalaxy from "starlight-theme-galaxy";
 
 import starlightBlog from "starlight-blog";
 import starlightLinksValidator from "starlight-links-validator";
+import starlightImageZoom from 'starlight-image-zoom'
 import mermaid from "astro-mermaid";
 
 // https://astro.build/config
@@ -111,6 +112,7 @@ export default defineConfig({
       ],
       plugins: [
         starlightThemeGalaxy(),
+        starlightImageZoom(),
         starlightBlog({
           metrics: { readingTime: true, words: false },
           authors: {

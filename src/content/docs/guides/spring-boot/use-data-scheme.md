@@ -5,6 +5,10 @@ description: Using data.sql and schema in spring boot
 sidebar:
   order: 4
 ---
+> **_NOTE:_** If you are using only loading data from `data.sql` use the following settings to defer the entities created by spring boot, this will create tables before inserting data into those tables.
+```properties
+    jpa.defer-datasource-initialization: true
+```
 
 ### 1. Place the files
 - Create the following files in your src/main/resources directory:
