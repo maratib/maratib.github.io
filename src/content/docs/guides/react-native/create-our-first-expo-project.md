@@ -17,6 +17,7 @@ Let's create our first react-native Expo project.
 ```bash
 # expo-starter
 npx rn-new@latest [project-name] options
+npx rn-new@latest my-app --pnpm
 
 
 # Following command used to create this project
@@ -32,6 +33,8 @@ npx rn-new@latest expo-starter --expo-router --tabs --nativewind --zustand --sup
 ```bash
 # To create a new project 
 pnpm create expo-app@latest -t
+
+pnpx create-expo-app -t blank-typescript
 
 # To add safe-area-context
 pnpm add react-native-safe-area-context

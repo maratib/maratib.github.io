@@ -88,6 +88,10 @@ export default defineConfig({
               label: "Creating our first Cli project",
               link: "guides/react-native/create-our-first-cli-project",
             },
+            // {
+            //   label: "Stack Navigation Tutorial",
+            //   link: "guides/react-native/stack-navigation-tutorial",
+            // },
             {
               label: "Navigation Options",
               collapsed: true,
