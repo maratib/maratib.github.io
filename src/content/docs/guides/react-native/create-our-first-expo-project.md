@@ -8,9 +8,11 @@ sidebar:
 
 Let's create our first react-native Expo project.
 
-[rn.new](https://rn.new/) for more details
+ 
+## To create using [rn.new](https://rn.new/)
 
-### To create latest version of expo
+<details>
+<summary>Details</summary>
 
 ```bash
 # expo-starter
@@ -21,20 +23,62 @@ npx rn-new@latest [project-name] options
 npx rn-new@latest expo-starter --expo-router --tabs --nativewind --zustand --supabase --pnpm
 
 ```
+</details>
 
-### To create latest `BETA` version of expo
+## To create using [create-expo-app](https://docs.expo.dev/router/installation/)
+<details>
+<summary>Details</summary>
+
+```bash
+# To create a new project 
+pnpm create expo-app@latest -t
+
+# To add safe-area-context
+pnpm add react-native-safe-area-context
+# more details https://docs.expo.dev/develop/user-interface/safe-areas/ 
+
+# To add expo router
+pnpm add expo-router react-native-safe-area-context react-native-screens expo-linking expo-constants expo-status-bar
+
+# Add entry point to package.json
+{
+  "main": "expo-router/entry"
+}
+
+# Add a deep linking scheme in your app config:
+{
+  "scheme": "your-app-scheme"
+}
+
+# Modify babel.config.js
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+  };
+};
+
+# Run your app
+npx expo start --clear
+
+
+```
+</details>
+
+
+## To create latest `BETA` version of expo
+<details>
+<summary>Details</summary>
 
 ```bash
 # expo-starter
 pnpm create expo-app --template default@next expo-54-beta-plain
 ```
+</details>
 
+## Show `rn-new` help
 <details>
-  <summary>
-
-### Show `rn-new` help
-
-  </summary>
+  <summary>Details</summary>
 
 ```bash
 npx rn-new@latest --help
@@ -113,12 +157,10 @@ you pass in. This is also useful for CI/CD environments.
 
 </details>
 
+## Show `expo-app` help
+
 <details>
-  <summary>
-
-### Show `expo-app` help
-
-  </summary>
+  <summary>Details</summary>
 
 ```bash
 pnpm create expo-app --help
