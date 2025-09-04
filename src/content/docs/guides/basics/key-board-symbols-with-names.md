@@ -1,6 +1,6 @@
 ---
 title: Keyboard Symbols with Names
-slug: guides/basics/key-board-symbols-with-names.
+slug: guides/basics/key-board-symbols-with-names
 description: Keyboard Symbols with Names
 sidebar:
   order: 0
