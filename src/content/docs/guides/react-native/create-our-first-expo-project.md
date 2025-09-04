@@ -34,7 +34,7 @@ npx rn-new@latest expo-starter --expo-router --tabs --nativewind --zustand --sup
 # To create a new project 
 pnpm create expo-app@latest -t
 
-pnpx create-expo-app -t blank-typescript
+pnpm create expo-app@latest my-app -t blank-typescript
 
 # To add safe-area-context
 pnpm add react-native-safe-area-context

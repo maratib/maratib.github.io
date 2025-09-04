@@ -39,6 +39,11 @@ export default defineConfig({
           link: "/guides/courses",
         },
         {
+          label: "Basics",
+          collapsed: true,
+          autogenerate: { directory: "guides/basics" },
+        },
+        {
           label: "Java",
           collapsed: true,
           autogenerate: { directory: "guides/java" },
