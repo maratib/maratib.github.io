@@ -44,6 +44,11 @@ export default defineConfig({
           autogenerate: { directory: "guides/basics" },
         },
         {
+          label: "Typescript",
+          collapsed: true,
+          autogenerate: { directory: "guides/typescript" },
+        },
+        {
           label: "Java",
           collapsed: true,
           autogenerate: { directory: "guides/java" },
