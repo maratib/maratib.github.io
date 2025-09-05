@@ -13,9 +13,6 @@ Bun is a fast JavaScript runtime that's excellent for TypeScript development. He
 First, install Bun:
 
 ```bash
-# Using curl
-curl -fsSL https://bun.sh/install | bash
-
 # Using npm
 npm install -g bun
 ```
