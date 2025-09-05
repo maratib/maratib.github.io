@@ -1,7 +1,7 @@
 ---
-title: Typescript Operators
+title: Typescript All Operators
 slug: guides/typescript/typescript-operators
-description: Typescript Operators
+description: Typescript All Operators
 sidebar:
   order: 1
 ---

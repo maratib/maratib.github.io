@@ -50,8 +50,21 @@ export default defineConfig({
         },
         {
           label: "Java",
-          collapsed: true,
-          autogenerate: { directory: "guides/java" },
+          items: [
+
+            {
+              label: "OOP Design Patterns",
+              link: "guides/java/oop-design-patterns",
+            },
+            {
+              label: "Hibernate",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/java/hibernate",
+              },
+            },
+
+          ]
         },
         {
           label: "J2EE",
@@ -76,7 +89,39 @@ export default defineConfig({
         {
           label: "React",
           collapsed: true,
-          autogenerate: { directory: "guides/react" },
+          items: [
+            {
+              label: "React Introduction",
+              link: "guides/react/react-introduction",
+            },
+            {
+              label: "React 19 Introduction",
+              link: "guides/react/react-19-introduction",
+            },
+            {
+              label: "React Component Patterns",
+              link: "guides/react/react-patterns",
+            },
+            {
+              label: "React with Zustand",
+              link: "guides/react/react-with-zustand",
+            },
+            {
+              label: "React with TanStack Query",
+              link: "guides/react/react-with-tanstack-query",
+            },
+            {
+              label: "React Router V7",
+              link: "guides/react/react-router-v7",
+            },
+            {
+              label: "React Hooks",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/react/hooks",
+              },
+            },
+          ],
         },
         {
           label: "React Native",
@@ -97,6 +142,14 @@ export default defineConfig({
             {
               label: "Creating our first Cli project",
               link: "guides/react-native/create-our-first-cli-project",
+            },
+            {
+              label: "React Native Introduction",
+              link: "guides/react-native/react-native-introduction",
+            },
+            {
+              label: "ForwardRef Guide",
+              link: "guides/react-native/forward-ref",
             },
             // {
             //   label: "Stack Navigation Tutorial",

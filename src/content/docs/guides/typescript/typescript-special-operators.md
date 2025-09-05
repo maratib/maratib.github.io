@@ -1,9 +1,9 @@
 ---
-title: Typescript Operators
-slug: guides/typescript/typescript-operators
-description: Typescript Operators
+title: Typescript Special Operators
+slug: guides/typescript/typescript-special-operators
+description: Typescript Special Operators
 sidebar:
-  order: 1
+  order: 2
 ---
 
 
