@@ -3,7 +3,7 @@ title: Typescript for react developers
 slug: guides/typescript/typescript-for-react-developers
 description: Typescript for react developers
 sidebar:
-  order: 3
+  order: 4
 ---
 
 As a React developer, you already understand component-based architecture, state management, and JSX. TypeScript enhances your React development by adding static type checking, better tooling, and improved code quality. Let's focus on the TypeScript concepts most relevant to React.
