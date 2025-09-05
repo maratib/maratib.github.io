@@ -1,9 +1,6 @@
 ---
 title: OOP Design Patterns
-slug: guides/java/oop-design-patterns
 description: OOP Design Patterns
-sidebar:
-  order: 0
 ---
 
 

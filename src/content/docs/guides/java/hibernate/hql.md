@@ -15,7 +15,7 @@ Hibernate provides multiple ways to query data:
 
 - Criteria API offers a type-safe, programmatic way to create queries.
 
-![Core Architecture](/img/java/hibernate/hql.svg)
+![HQL](/img/java/hibernate/hql.svg)
 
 ### HQL (Hibernate Query Language)
 ```java

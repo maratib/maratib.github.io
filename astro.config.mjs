@@ -57,6 +57,10 @@ export default defineConfig({
               link: "guides/java/oop-design-patterns",
             },
             {
+              label: "Java 8 Features",
+              link: "guides/java/java-8-features",
+            },
+            {
               label: "Hibernate",
               collapsed: true,
               autogenerate: {

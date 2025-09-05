@@ -1,12 +1,10 @@
 ---
-title: Design Patterns
-slug: guides/java/oop-design-patterns
-description: OOP Design Patterns
+title: Jakarta Persistence Annotations
+slug: guides/spring-boot/jap/jakarta-persistence-annotations
+description: Jakarta Persistence Annotations
 sidebar:
   order: 0
 ---
-
-# Jakarta Persistence (JPA) Annotations Reference Guide
 
 ## Table of Jakarta Persistence Annotations
 
