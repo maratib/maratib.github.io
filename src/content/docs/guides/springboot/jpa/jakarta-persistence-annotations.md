@@ -1,9 +1,9 @@
 ---
 title: Jakarta Persistence Annotations
-slug: guides/spring-boot/jap/jakarta-persistence-annotations
+slug: guides/springboot/jap/jakarta-persistence-annotations
 description: Jakarta Persistence Annotations
 sidebar:
-  order: 0
+  order: 1
 ---
 
 ## Table of Jakarta Persistence Annotations

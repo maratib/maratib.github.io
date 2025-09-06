@@ -106,8 +106,31 @@ export default defineConfig({
         },
         {
           label: "Spring Boot",
-          collapsed: true,
-          autogenerate: { directory: "guides/spring-boot" },
+          items: [
+            {
+              label: "Spring Boot Startup",
+              link: "guides/springboot/springboot-startup",
+            },
+            {
+              label: "Bean Scopes",
+              link: "guides/springboot/bean-scope",
+            },
+            {
+              label: "Request Lifecycle",
+              link: "guides/springboot/request-life-cycle",
+            },
+            {
+              label: "Layered Architecture ",
+              link: "guides/springboot/layered-architecture",
+            },
+            {
+              label: "JPA",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/springboot/jpa",
+              },
+            },
+          ],
         },
         {
           label: "Flutter",
@@ -157,27 +180,27 @@ export default defineConfig({
           items: [
             {
               label: "React Native Learning Course",
-              link: "guides/react-native/react-native-learning-course",
+              link: "guides/reactnative/react-native-learning-course",
             },
             {
               label: "Setting up dev environment",
-              link: "guides/react-native/setup-development-environment",
+              link: "guides/reactnative/setup-development-environment",
             },
             {
               label: "Creating our first Expo project",
-              link: "guides/react-native/create-our-first-expo-project",
+              link: "guides/reactnative/create-our-first-expo-project",
             },
             {
               label: "Creating our first Cli project",
-              link: "guides/react-native/create-our-first-cli-project",
+              link: "guides/reactnative/create-our-first-cli-project",
             },
             {
               label: "React Native Introduction",
-              link: "guides/react-native/react-native-introduction",
+              link: "guides/reactnative/react-native-introduction",
             },
             {
               label: "ForwardRef Guide",
-              link: "guides/react-native/forward-ref",
+              link: "guides/reactnative/forward-ref",
             },
             // {
             //   label: "Stack Navigation Tutorial",

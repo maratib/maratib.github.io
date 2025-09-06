@@ -1,9 +1,6 @@
 ---
 title: Creating our first Expo project
-slug: guides/react-native/create-our-first-expo-project
 description: Creating our first Expo project
-sidebar:
-  order: 2
 ---
 
 Let's create our first react-native Expo project.

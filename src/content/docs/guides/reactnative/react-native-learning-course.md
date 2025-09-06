@@ -1,9 +1,6 @@
 ---
 title: React Native Learning Course
-slug: guides/react-native/react-native-learning-course
 description: Learn React Native 54 with latest and greatest features
-sidebar:
-  order: 0
 ---
 
 Welcome to the **React Native with Expo 53+ Learning Course**!

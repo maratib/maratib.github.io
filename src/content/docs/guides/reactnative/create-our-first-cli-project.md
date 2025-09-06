@@ -1,9 +1,6 @@
 ---
 title: Creating our first CLI project
-slug: guides/react-native/create-our-first-cli-project
 description: Creating our first Cli project
-sidebar:
-  order: 3
 ---
 
 Let's create our first react-native Cli project.

@@ -1,12 +1,9 @@
 ---
 title: Bean Scopes
-slug: guides/spring-boot/bean-scope
 description: Spring Boot Bean Scopes
-sidebar:
-  order: 1
 ---
 
-### 📌 Cheat Sheet (Quick Recall)
+### Cheat Sheet (Quick Recall)
 
 | Scope           | Lifetime                    | Use Case                   |
 | --------------- | --------------------------- | -------------------------- |
@@ -18,10 +15,10 @@ sidebar:
 | **WebSocket**   | One per WebSocket session   | Real-time WebSocket apps   |
 
 
-### 🟢 Spring Boot Bean Scopes
+### Spring Boot Bean Scopes
 
-In **Spring Framework**, every object managed by the IoC container is called a **Bean**.
-A *scope* defines **lifecycle and visibility** of a bean in the application context.
+*   In `Spring Framework`, every object managed by the **IoC container** is called a **Bean**.
+*   A **scope** defines **lifecycle and visibility** of a bean in the `application context`.
 
 ---
 
@@ -166,7 +163,7 @@ graph TD
 
 ---
 
-### 🟢 How @Scope Works with @Autowired
+### How @Scope Works with @Autowired
 
 When you inject beans with `@Autowired`, the **scope of the injected bean matters**.
 

@@ -1,9 +1,6 @@
 ---
 title: Stack Navigation Tutorial
-slug: guides/react-native/stack-navigation-tutorial
 description: Stack Navigation Tutorial
-sidebar:
-  order: 1
 ---
 
 Let's create a blank typescript react native app :-
