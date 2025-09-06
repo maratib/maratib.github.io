@@ -1,9 +1,6 @@
 ---
 title: Typescript complete reference
-slug: guides/typescript/typescript-language-cheat-sheet
 description: Typescript complete reference
-sidebar:
-  order: 0
 ---
 
 - A complete Typescript language reference

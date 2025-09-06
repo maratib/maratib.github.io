@@ -1,9 +1,6 @@
 ---
 title: Typescript with Bun
-slug: guides/typescript/typescript-with-bun
 description: Typescript with Bun
-sidebar:
-  order: 3
 ---
 
 Bun is a fast JavaScript runtime that's excellent for TypeScript development. Here's how to get started learning TypeScript using Bun:

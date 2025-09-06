@@ -1,9 +1,6 @@
 ---
 title: Typescript All Operators
-slug: guides/typescript/typescript-operators
 description: Typescript All Operators
-sidebar:
-  order: 1
 ---
 
 - A complete Typescript language reference

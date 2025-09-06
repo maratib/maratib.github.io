@@ -45,8 +45,32 @@ export default defineConfig({
         },
         {
           label: "Typescript",
-          collapsed: true,
-          autogenerate: { directory: "guides/typescript" },
+          items: [
+            {
+              label: "Typescript with Bun",
+              link: "guides/typescript/typescript-with-bun",
+            },
+            {
+              label: "Typescript complete reference",
+              link: "guides/typescript/typescript-language-reference",
+            },
+            {
+              label: "Typescript Special Operators",
+              link: "guides/typescript/typescript-special-operators",
+            },
+            {
+              label: "Typescript All Operators",
+              link: "guides/typescript/typescript-operators",
+            },
+            {
+              label: "Types vs Interfaces",
+              link: "guides/typescript/types-vs-interfaces",
+            },
+            {
+              label: "Typescript for React",
+              link: "guides/typescript/typescript-for-react",
+            },
+          ]
         },
         {
           label: "Java",

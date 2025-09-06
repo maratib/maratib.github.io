@@ -1,9 +1,6 @@
 ---
 title: Typescript Special Operators
-slug: guides/typescript/typescript-special-operators
 description: Typescript Special Operators
-sidebar:
-  order: 2
 ---
 
 
