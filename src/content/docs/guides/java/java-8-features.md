@@ -10,8 +10,7 @@ description: Java 8 new features
 5. [Optional Class](#optional-class)
 6. [Default Methods](#default-methods)
 7. [Date and Time API](#date-and-time-api)
-8. [Nashorn JavaScript Engine](#nashorn)
-9. [Parallel Arrays](#parallel-arrays)
+8. [Parallel Arrays](#parallel-arrays)
 
 ---
 
@@ -54,7 +53,7 @@ Function<String, Integer> func = (s) -> {
 
 ---
 
-## Functional Interfaces `SAM`
+## Functional Interfaces
 An interface with exactly one abstract method, often called `SAM`. 
 It can contain multiple default or static methods.
 
