@@ -44,6 +44,11 @@ export default defineConfig({
           autogenerate: { directory: "guides/basics" },
         },
         {
+          label: "SQL",
+          collapsed: true,
+          autogenerate: { directory: "guides/sql" },
+        },
+        {
           label: "Typescript",
           items: [
             {
