@@ -1,9 +1,6 @@
 ---
 title: Typescript for react developers
-slug: guides/typescript/typescript-for-react-developers
 description: Typescript for react developers
-sidebar:
-  order: 5
 ---
 
 As a React developer, you already understand component-based architecture, state management, and JSX. TypeScript enhances your React development by adding static type checking, better tooling, and improved code quality. Let's focus on the TypeScript concepts most relevant to React.
@@ -11,31 +8,34 @@ As a React developer, you already understand component-based architecture, state
 ## Basic TypeScript Types for React
 
 ### Primitive Types
+
 ```typescript
-const name: string = 'John';
+const name: string = "John";
 const age: number = 30;
 const isActive: boolean = true;
-const items: string[] = ['item1', 'item2'];
+const items: string[] = ["item1", "item2"];
 ```
 
 ### Union Types
+
 ```typescript
-type Status = 'loading' | 'success' | 'error';
-const status: Status = 'loading';
+type Status = "loading" | "success" | "error";
+const status: Status = "loading";
 ```
 
 ## Typing React Components
 
 ### Functional Components
+
 ```typescript
 // Basic component with props
 type Props = {
   name: string;
   age?: number; // Optional prop
-}
+};
 
 //If no age param setting default to 18
-const Greeting = ({ name, age = 18 }: Prop) => { 
+const Greeting = ({ name, age = 18 }: Prop) => {
   return (
     <div>
       Hello {name}
@@ -46,6 +46,7 @@ const Greeting = ({ name, age = 18 }: Prop) => {
 ```
 
 ### Alternative: Using React.FC vs Direct Function
+
 ```typescript
 // With React.FC (includes children by default)
 const Component: React.FC<Props> = ({ children }) => <div>{children}</div>;
@@ -59,24 +60,26 @@ const Component = ({ children }: Props & { children?: React.ReactNode }) => (
 ## Common React Patterns with TypeScript
 
 ### useState Hook
+
 ```typescript
-import { useState } from 'react';
+import { useState } from "react";
 
 const UserProfile = () => {
   // Type inferred: string
-  const [name, setName] = useState('John');
-  
+  const [name, setName] = useState("John");
+
   // Explicit type for complex state
   const [user, setUser] = useState<{ name: string; age: number } | null>(null);
-  
+
   // Array state with type
   const [todos, setTodos] = useState<string[]>([]);
 };
 ```
 
 ### useEffect and useCallback
+
 ```typescript
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from "react";
 
 interface User {
   id: number;
@@ -99,23 +102,24 @@ const UserComponent = ({ userId }: { userId: number }) => {
 ```
 
 ### useReducer Hook
+
 ```typescript
 type State = {
   count: number;
 };
 
-type Action = 
-  | { type: 'increment' }
-  | { type: 'decrement' }
-  | { type: 'reset'; payload: number };
+type Action =
+  | { type: "increment" }
+  | { type: "decrement" }
+  | { type: "reset"; payload: number };
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
-    case 'increment':
+    case "increment":
       return { count: state.count + 1 };
-    case 'decrement':
+    case "decrement":
       return { count: state.count - 1 };
-    case 'reset':
+    case "reset":
       return { count: action.payload };
     default:
       return state;
@@ -124,11 +128,11 @@ const reducer = (state: State, action: Action): State => {
 
 const Counter = () => {
   const [state, dispatch] = useReducer(reducer, { count: 0 });
-  
+
   return (
     <div>
       Count: {state.count}
-      <button onClick={() => dispatch({ type: 'increment' })}>+</button>
+      <button onClick={() => dispatch({ type: "increment" })}>+</button>
     </div>
   );
 };
@@ -137,10 +141,11 @@ const Counter = () => {
 ## Event Handling
 
 ### Form Events
+
 ```typescript
 const LoginForm = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -153,15 +158,11 @@ const LoginForm = () => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <input 
-        type="email" 
-        value={email} 
-        onChange={handleEmailChange}
-      />
-      <input 
-        type="password" 
-        value={password} 
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+      <input type="email" value={email} onChange={handleEmailChange} />
+      <input
+        type="password"
+        value={password}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
           setPassword(e.target.value)
         }
       />
@@ -172,6 +173,7 @@ const LoginForm = () => {
 ```
 
 ### Click Events
+
 ```typescript
 const Button = ({ onClick }: { onClick: (e: React.MouseEvent) => void }) => {
   return <button onClick={onClick}>Click me</button>;
@@ -181,6 +183,7 @@ const Button = ({ onClick }: { onClick: (e: React.MouseEvent) => void }) => {
 ## Advanced Component Patterns
 
 ### Generic Components
+
 ```typescript
 interface ListProps<T> {
   items: T[];
@@ -201,10 +204,11 @@ function List<T>({ items, renderItem }: ListProps<T>) {
 <List<{ id: number; name: string }>
   items={users}
   renderItem={(user) => <span>{user.name}</span>}
-/>
+/>;
 ```
 
 ### Higher-Order Components
+
 ```typescript
 interface WithLoadingProps {
   loading: boolean;
@@ -215,7 +219,7 @@ const withLoading = <P extends object>(
 ): React.FC<P & WithLoadingProps> => {
   return ({ loading, ...props }: WithLoadingProps & P) => {
     if (loading) return <div>Loading...</div>;
-    return <Component {...props as P} />;
+    return <Component {...(props as P)} />;
   };
 };
 
@@ -228,17 +232,21 @@ const UserProfileWithLoading = withLoading(UserProfile);
 
 ```typescript
 interface ThemeContextType {
-  theme: 'light' | 'dark';
+  theme: "light" | "dark";
   toggleTheme: () => void;
 }
 
-const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = React.createContext<ThemeContextType | undefined>(
+  undefined
+);
 
-const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
   };
 
   return (
@@ -252,7 +260,7 @@ const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 const useTheme = () => {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;
 };
@@ -266,7 +274,10 @@ interface UseLocalStorageResult<T> {
   setValue: (value: T) => void;
 }
 
-function useLocalStorage<T>(key: string, initialValue: T): UseLocalStorageResult<T> {
+function useLocalStorage<T>(
+  key: string,
+  initialValue: T
+): UseLocalStorageResult<T> {
   const [value, setValue] = useState<T>(() => {
     const stored = localStorage.getItem(key);
     return stored ? JSON.parse(stored) : initialValue;
@@ -280,7 +291,10 @@ function useLocalStorage<T>(key: string, initialValue: T): UseLocalStorageResult
 }
 
 // Usage
-const { value: user, setValue: setUser } = useLocalStorage<User>('user', initialUser);
+const { value: user, setValue: setUser } = useLocalStorage<User>(
+  "user",
+  initialUser
+);
 ```
 
 ## Common Utility Types
@@ -298,13 +312,13 @@ const updateUser = (updates: Partial<UserForm>) => {
 };
 
 // Pick and Omit for specific props
-type UserName = Pick<User, 'name'>;
-type UserWithoutId = Omit<User, 'id'>;
+type UserName = Pick<User, "name">;
+type UserWithoutId = Omit<User, "id">;
 
 // Record for object maps
 const userRoles: Record<number, string> = {
-  1: 'admin',
-  2: 'user'
+  1: "admin",
+  2: "user",
 };
 ```
 
@@ -329,7 +343,7 @@ const safeUser = user as User; // ✅ Use type assertion sparingly
 
 // Better: Type guards
 function isUser(obj: any): obj is User {
-  return obj && typeof obj.name === 'string';
+  return obj && typeof obj.name === "string";
 }
 
 if (isUser(someObject)) {
