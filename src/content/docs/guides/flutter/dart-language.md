@@ -3,7 +3,7 @@ title: Dart language
 slug: guides/flutter/dart-language
 description: Dart language complete reference
 sidebar:
-  order: 0
+  order: 1
 ---
 
 - Dart language reference
@@ -21,6 +21,7 @@ void main() {
 ## Variables & Data Types
 
 ### Variable Declaration
+
 Different ways to declare variables in Dart with various mutability and type constraints.
 
 ```dart
@@ -32,6 +33,7 @@ dynamic dynamicVar = 'hello'; // Can hold any type, bypasses static type checkin
 ```
 
 ### Basic Data Types
+
 Dart's built-in primitive and core data types.
 
 ```dart
@@ -60,6 +62,7 @@ var heart = '\u2665'; // Heart symbol
 ## Operators
 
 ### Arithmetic Operators
+
 Mathematical operations for performing calculations.
 
 ```dart
@@ -73,6 +76,7 @@ print(a % b); // 1 - Modulus (remainder)
 ```
 
 ### Equality & Relational Operators
+
 Operators for comparing values and determining relationships.
 
 ```dart
@@ -85,6 +89,7 @@ print(a <= b); // false - Less than or equal to
 ```
 
 ### Logical Operators
+
 Boolean logic operations for combining conditions.
 
 ```dart
@@ -95,6 +100,7 @@ print(!x); // false - Logical NOT (inverts the value)
 ```
 
 ### Type Test Operators
+
 Operators for checking types at runtime.
 
 ```dart
@@ -104,6 +110,7 @@ print(value is! int); // true - Negated type check
 ```
 
 ### Cascade Operator (..)
+
 Allows multiple operations on the same object without repeating the object reference.
 
 ```dart
@@ -114,6 +121,7 @@ var person = Person()
 ```
 
 ### Null-aware Operators
+
 Special operators for handling null values safely.
 
 ```dart
@@ -126,6 +134,7 @@ nullableString ??= 'new value'; // Null-aware assignment (assigns only if curren
 ## Control Flow
 
 ### If-Else
+
 Conditional execution based on boolean expressions.
 
 ```dart
@@ -139,6 +148,7 @@ if (age < 18) {
 ```
 
 ### Switch Statement
+
 Multi-way branch based on a single value, more efficient than multiple if-else statements.
 
 ```dart
@@ -155,6 +165,7 @@ switch (grade) {
 ```
 
 ### For Loops
+
 Different ways to iterate over sequences or execute code repeatedly.
 
 ```dart
@@ -174,6 +185,7 @@ list.forEach((item) => print(item));
 ```
 
 ### While Loops
+
 Execute code repeatedly while a condition remains true.
 
 ```dart
@@ -195,6 +207,7 @@ do {
 ## Functions
 
 ### Basic Function
+
 Reusable blocks of code that perform specific tasks.
 
 ```dart
@@ -207,6 +220,7 @@ int multiply(int a, int b) => a * b;
 ```
 
 ### Optional Parameters
+
 Parameters that can be omitted when calling a function.
 
 ```dart
@@ -225,6 +239,7 @@ introduce('Bob'); // Without optional parameter
 ```
 
 ### First-class Functions
+
 Functions can be assigned to variables, passed as arguments, and returned from other functions.
 
 ```dart
@@ -237,6 +252,7 @@ executeFunction(sayHello); // Function passed as argument
 ```
 
 ### Anonymous Functions
+
 Functions without a name, often used as arguments to other functions.
 
 ```dart
@@ -249,6 +265,7 @@ numbers.forEach((number) { // Anonymous function as argument
 ## Classes & Objects
 
 ### Basic Class
+
 Blueprint for creating objects with properties and methods.
 
 ```dart
@@ -256,21 +273,21 @@ class Person {
   // Fields - variables that belong to the class
   String name;
   int age;
-  
+
   // Constructor - special method for creating instances
   Person(this.name, this.age); // Shorthand for assigning parameters to fields
-  
+
   // Named constructor - alternative way to create instances
   Person.anonymous() : name = 'Anonymous', age = 0;
-  
+
   // Method - function that belongs to the class
   void introduce() {
     print('I am $name, $age years old');
   }
-  
+
   // Getter - special method that returns a value
   String get description => '$name ($age)';
-  
+
   // Setter - special method that sets a value
   set updateAge(int newAge) {
     age = newAge;
@@ -283,14 +300,15 @@ person.introduce();
 ```
 
 ### Inheritance
+
 Creating a new class based on an existing class, inheriting its properties and methods.
 
 ```dart
 class Employee extends Person { // Employee inherits from Person
   String position;
-  
+
   Employee(String name, int age, this.position) : super(name, age); // super calls parent constructor
-  
+
   @override // Indicates method is overriding parent method
   void introduce() {
     super.introduce(); // Call parent method
@@ -300,12 +318,13 @@ class Employee extends Person { // Employee inherits from Person
 ```
 
 ### Abstract Classes
+
 Classes that can't be instantiated directly, used as base classes for inheritance.
 
 ```dart
 abstract class Animal { // Cannot create Animal instances directly
   void makeSound(); // Abstract method (no implementation)
-  
+
   void sleep() { // Concrete method with implementation
     print('Sleeping...');
   }
@@ -320,6 +339,7 @@ class Dog extends Animal {
 ```
 
 ### Interfaces
+
 Contracts that classes can implement, requiring them to provide specific methods.
 
 ```dart
@@ -338,6 +358,7 @@ class ConsoleLogger implements Logger { // Implements Logger interface
 ## Null Safety
 
 ### Nullable Types
+
 Dart's null safety feature prevents null reference errors at compile time.
 
 ```dart
@@ -355,6 +376,7 @@ void initialize() {
 ```
 
 ### Null-aware Operators
+
 Operators that handle null values gracefully without causing exceptions.
 
 ```dart
@@ -367,6 +389,7 @@ name ??= 'assigned'; // Assigns value only if variable is currently null
 ## Collections
 
 ### Lists
+
 Ordered collections of elements (like arrays in other languages).
 
 ```dart
@@ -389,6 +412,7 @@ var combined = [...numbers, ...names]; // Combine two lists
 ```
 
 ### Sets
+
 Unordered collections of unique elements.
 
 ```dart
@@ -403,6 +427,7 @@ print(set1.intersection(set2)); // {3} - Elements common to both sets
 ```
 
 ### Maps
+
 Collections of key-value pairs (like dictionaries or objects).
 
 ```dart
@@ -427,6 +452,7 @@ ages.forEach((key, value) {
 ## Exception Handling
 
 ### Try-Catch
+
 Handling errors and exceptional situations gracefully.
 
 ```dart
@@ -442,6 +468,7 @@ try {
 ```
 
 ### Throwing Exceptions
+
 Creating and raising exceptions in your code.
 
 ```dart
@@ -455,7 +482,7 @@ void checkAge(int age) {
 class CustomException implements Exception {
   final String message;
   CustomException(this.message);
-  
+
   @override
   String toString() => 'CustomException: $message'; // Custom string representation
 }
@@ -464,6 +491,7 @@ class CustomException implements Exception {
 ## Asynchronous Programming
 
 ### Futures
+
 Representing a potential value or error that will be available at some time in the future.
 
 ```dart
@@ -476,7 +504,7 @@ void main() async { // main can also be async
   print('Loading...');
   var user = await fetchUser(); // await pauses execution until Future completes
   print(user);
-  
+
   // Error handling with async/await
   try {
     var data = await fetchUser();
@@ -487,6 +515,7 @@ void main() async { // main can also be async
 ```
 
 ### Streams
+
 Sequences of asynchronous events that can be listened to multiple times.
 
 ```dart
@@ -507,14 +536,15 @@ void main() async {
 ## Generics
 
 ### Generic Classes
+
 Classes that can work with any data type while maintaining type safety.
 
 ```dart
 class Box<T> { // T is type parameter
   T value;
-  
+
   Box(this.value);
-  
+
   T getValue() => value;
 }
 
@@ -523,6 +553,7 @@ var intBox = Box<int>(42); // Box specialized for int
 ```
 
 ### Generic Methods
+
 Methods that can work with different types while maintaining type safety.
 
 ```dart
@@ -563,7 +594,7 @@ Adding functionality to existing libraries or classes without modifying their so
 ```dart
 extension StringExtensions on String { // Extension on String type
   String get reversed => split('').reversed.join(); // New getter property
-  
+
   bool get isPalindrome {
     var clean = replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
     return clean == clean.reversed;
@@ -579,6 +610,7 @@ void main() {
 ## Libraries & Imports
 
 ### Importing
+
 Including code from other files or packages in your Dart program.
 
 ```dart
@@ -599,6 +631,7 @@ import 'package:heavy_library/heavy.dart' deferred as heavy;
 ```
 
 ### Exporting
+
 Making library members available to other libraries that import it.
 
 ```dart
@@ -610,6 +643,7 @@ export 'src/models.dart'; // Re-export from another file
 ```
 
 ### Part/Part of
+
 Splitting a library across multiple files while maintaining a single library namespace.
 
 ```dart
