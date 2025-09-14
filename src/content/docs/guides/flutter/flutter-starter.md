@@ -10,9 +10,10 @@ The **`flutter starter`** project.
 
 ```bash
 git clone git@github.com:maratib/flutter_starter.git
+```
 
-# Or you can name your new project like:
+## Or you can name your new project like:
 
+```bash
 git clone git@github.com:maratib/flutter_starter.git [project_name]
-
 ```
