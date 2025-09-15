@@ -1,7 +1,7 @@
 ---
-title: Container
+title: Flutter Container
 slug: guides/flutter/container
-description: Container
+description: Flutter Container
 sidebar:
   order: 17
 ---
