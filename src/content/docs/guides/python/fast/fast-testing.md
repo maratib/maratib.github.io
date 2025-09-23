@@ -572,8 +572,8 @@ pytest test_main.py -v
 
 FastAPI automatically generates documentation:
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **Swagger UI**: localhost:8000/docs
+- **ReDoc**: localhost:8000/redoc
 
 ### Key Features Demonstrated
 

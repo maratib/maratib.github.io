@@ -55,8 +55,8 @@ def home():
 
 Open:
 
-- Swagger UI → `http://127.0.0.1:8000/docs`
-- Redoc → `http://127.0.0.1:8000/redoc`
+- Swagger UI → 127.0.0.1:8000/docs
+- Redoc → 127.0.0.1:8000/redoc
 
 ---
 
