@@ -50,6 +50,7 @@ export default defineConfig({
         },
         {
           label: "Typescript",
+          collapsed: true,
           items: [
             {
               label: "Typescript with Bun",
@@ -79,6 +80,7 @@ export default defineConfig({
         },
         {
           label: "Java",
+          collapsed: true,
           items: [
 
             {
@@ -111,6 +113,7 @@ export default defineConfig({
         },
         {
           label: "Spring Boot",
+          collapsed: true,
           items: [
             {
               label: "Spring Boot Startup",
@@ -133,6 +136,13 @@ export default defineConfig({
               collapsed: true,
               autogenerate: {
                 directory: "guides/springboot/jpa",
+              },
+            },
+            {
+              label: "Reactor",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/springboot/reactor",
               },
             },
           ],
