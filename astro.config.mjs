@@ -78,6 +78,45 @@ export default defineConfig({
             },
           ]
         },
+         {
+          label: "Python",
+          collapsed: true,
+           items: [
+             {
+              label: "Python Basics",
+              link: "guides/python/python-basics",
+            },
+             {
+              label: "Dunder Methods",
+              link: "guides/python/dunder-methods",
+            },
+             {
+              label: "Python OOP",
+              link: "guides/python/python-oops",
+            },
+             {
+              label: "Flask",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/python/flask",
+              },
+            },
+             {
+              label: "Fast API",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/python/fast",
+              },
+            },
+             {
+              label: "SQLAlchemy ORM",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/python/alchemy",
+              },
+            },
+           ]
+        },
         {
           label: "Java",
           collapsed: true,
