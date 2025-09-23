@@ -11,10 +11,9 @@ FastAPI is a modern, fast (high-performance) web framework for building APIs wit
 ### Installation
 
 ```bash
-python -m venv fast_env
-source flask_env/bin/activate  # On Windows: flask_env\Scripts\activate
-pip install fastapi
-pip install uvicorn[standard]
+python -m venv venv
+source venv/bin/activate
+pip install fastapi uvicorn
 ```
 
 ### Basic Setup
