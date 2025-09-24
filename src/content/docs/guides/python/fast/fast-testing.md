@@ -1,7 +1,7 @@
 ---
-title: Fast API Testing
+title: Fast Testing
 slug: guides/python/fast/fast-testing
-description: Fast API Testing
+description: Fast Testing
 sidebar:
   order: 4
 ---

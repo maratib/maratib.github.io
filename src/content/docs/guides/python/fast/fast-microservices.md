@@ -1,14 +1,14 @@
 ---
-title: Microservices
+title: Fast Microservices
 slug: guides/python/fast/fast-microservices
-description: Microservices
+description: Fast Microservices
 sidebar:
-  order: 5
+  order: 9
 ---
 
 Building microservices architecture using FastAPI, including service discovery, communication, deployment, and monitoring.
 
-## Architecture Overview
+### Architecture Overview
 
 We'll build an e-commerce microservices system with these services:
 
@@ -19,7 +19,7 @@ We'll build an e-commerce microservices system with these services:
 - **Inventory Service**: Stock management
 - **Notification Service**: Email/notifications
 
-## Project Structure
+### Project Structure
 
 ```
 microservices/
@@ -34,9 +34,9 @@ microservices/
 └── kubernetes/
 ```
 
-## 1. Core Services Implementation
+### 1. Core Services Implementation
 
-### Shared Dependencies (shared/)
+#### Shared Dependencies (shared/)
 
 **shared/models.py**
 
@@ -88,7 +88,7 @@ def create_database(service_name: str):
     return engine, SessionLocal, Base
 ```
 
-### User Service
+#### User Service
 
 **user_service/main.py**
 
@@ -228,7 +228,7 @@ def update_user(db: Session, user_id: str, user_update: schemas.UserUpdate):
     return db_user
 ```
 
-### Product Service
+#### Product Service
 
 **product_service/main.py**
 
@@ -276,9 +276,9 @@ async def update_product(product_id: str, product_update: schemas.ProductUpdate,
     return product
 ```
 
-## 2. Service Communication
+### 2. Service Communication
 
-### HTTP Communication with Circuit Breaker
+#### HTTP Communication with Circuit Breaker
 
 **shared/http_client.py**
 
@@ -352,7 +352,7 @@ product_service_client = ServiceClient("http://product-service:8001")
 order_service_client = ServiceClient("http://order-service:8002")
 ```
 
-### Order Service with Service Communication
+#### Order Service with Service Communication
 
 **order_service/main.py**
 
@@ -426,7 +426,7 @@ async def get_order(order_id: str, db: Session = Depends(get_db)):
     return order_data
 ```
 
-## 3. API Gateway
+### 3. API Gateway
 
 **api_gateway/main.py**
 
@@ -539,7 +539,7 @@ async def root():
     return {"message": "API Gateway is running"}
 ```
 
-## 4. Service Discovery & Configuration
+### 4. Service Discovery & Configuration
 
 **shared/config.py**
 
@@ -582,7 +582,7 @@ class Config:
         return cls.DATABASE_URLS.get(service_name)
 ```
 
-## 5. Authentication & Authorization
+### 5. Authentication & Authorization
 
 **shared/auth.py**
 
@@ -636,7 +636,7 @@ admin_only = RoleChecker(["admin"])
 admin_or_user = RoleChecker(["admin", "user"])
 ```
 
-## 6. Message Queue Integration
+### 6. Message Queue Integration
 
 **shared/rabbitmq.py**
 
@@ -685,7 +685,7 @@ class MessageQueue:
 mq = MessageQueue("amqp://guest:guest@rabbitmq//")
 ```
 
-## 7. Testing Strategy
+### 7. Testing Strategy
 
 **user_service/test_main.py**
 
@@ -754,7 +754,7 @@ def test_get_users(setup_database):
     assert data[0]["email"] == "test@example.com"
 ```
 
-## 8. Docker Configuration
+### 8. Docker Configuration
 
 **Dockerfile (for each service)**
 
@@ -842,7 +842,7 @@ services:
       - api-gateway
 ```
 
-## 9. Kubernetes Deployment
+### 9. Kubernetes Deployment
 
 **kubernetes/deployment.yaml**
 
@@ -882,7 +882,7 @@ spec:
       targetPort: 8000
 ```
 
-## 10. Monitoring & Logging
+### 10. Monitoring & Logging
 
 **shared/logging.py**
 
@@ -930,9 +930,9 @@ def log_request(request_id: str, method: str, path: str, user_id: str = None):
     })
 ```
 
-## 11. Running the Microservices
+### 11. Running the Microservices
 
-### Development
+#### Development
 
 ```bash
 # Start all services
@@ -945,7 +945,7 @@ cd order_service && uvicorn main:app --reload --port 8003
 cd api_gateway && uvicorn main:app --reload --port 8000
 ```
 
-### Testing
+#### Testing
 
 ```bash
 # Test individual services
@@ -957,7 +957,7 @@ curl http://localhost:8000/api/users/
 curl http://localhost:8000/api/products/
 ```
 
-## Key Benefits of This Architecture
+### Key Benefits of This Architecture
 
 1. **Scalability**: Each service can be scaled independently
 2. **Technology Diversity**: Different services can use different technologies
@@ -965,7 +965,7 @@ curl http://localhost:8000/api/products/
 4. **Independent Deployment**: Services can be deployed separately
 5. **Team Autonomy**: Different teams can work on different services
 
-## Best Practices Demonstrated
+### Best Practices Demonstrated
 
 1. **Database per Service**: Each service has its own database
 2. **API Gateway**: Single entry point for all requests

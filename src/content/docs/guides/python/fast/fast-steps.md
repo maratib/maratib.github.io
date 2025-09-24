@@ -1,7 +1,7 @@
 ---
-title: Fast API Step by Step
+title: Fast Step by Step
 slug: guides/python/fast/fast-steps
-description: Fast API Step by Step
+description: Fast Step by Step
 sidebar:
   order: 2
 ---

@@ -3,7 +3,7 @@ title: Fast GraphQL
 slug: guides/python/fast/fast-graphql
 description: Fast GraphQL
 sidebar:
-  order: 9
+  order: 7
 ---
 
 **GraphQL with FastAPI – Complete Guide**

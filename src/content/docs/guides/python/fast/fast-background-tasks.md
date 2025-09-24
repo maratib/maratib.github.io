@@ -3,7 +3,7 @@ title: Fast Background Tasks
 slug: guides/python/fast/fast-background-tasks
 description: Fast Background Tasks
 sidebar:
-  order: 8
+  order: 5
 ---
 
 **Running tasks in background in FastAPI**

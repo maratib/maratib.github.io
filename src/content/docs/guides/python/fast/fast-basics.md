@@ -1,9 +1,9 @@
 ---
-title: Fast API Basics
+title: Fast Basics
 slug: guides/python/fast/fast-basics
-description: Fast API Basics
+description: Fast Basics
 sidebar:
-  order: 0
+  order: 1
 ---
 
 FastAPI is a **modern, high-performance Python web framework** for building APIs, based on:

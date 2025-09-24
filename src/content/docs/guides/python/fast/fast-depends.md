@@ -1,9 +1,9 @@
 ---
-title: Fast API Depends
+title: Fast Depends
 slug: guides/python/fast/fast-depends
-description: Fast API Depends
+description: Fast with Depends
 sidebar:
-  order: 1
+  order: 4
 ---
 
 - **Depends** is **one of the most powerful features in FastAPI**.
@@ -12,22 +12,28 @@ sidebar:
 
 - A clean way to **reuse logic**, **enforce rules**, and **manage shared resources** like authentication, DB sessions, caching, etc.
 
----
+- 👉 **Pydantic** = Validates & parses data.
 
-### What is `Depends`?
+- 👉 **Depends** = Injects reusable logic/resources.
 
-- A special function in FastAPI that tells the framework:
-  👉 **Before calling my endpoint, run this function and pass its result to me.**
-- Used for:
+### 1. What is `Depends`?
 
-  - **Auth** (check user, roles, tokens)
-  - **Database sessions**
-  - **Common query parameters**
-  - **Reusable business logic**
+- `Depends` is FastAPI’s **Dependency Injection (DI) system**.
+- It tells FastAPI:
+  👉 “Before executing my endpoint, run this function and give me its result.”
 
 ---
 
-### Basic Example
+### 2. Why Use `Depends`?
+
+- ✅ **Reusability** → share logic across endpoints (auth, db sessions).
+- ✅ **Clean code** → keep endpoints small and focused.
+- ✅ **Testability** → mock dependencies easily.
+- ✅ **Security** → centralize auth/permissions.
+
+---
+
+### 3. Basic Example
 
 ```python
 from fastapi import FastAPI, Depends, HTTPException
@@ -45,146 +51,99 @@ def secure_data(token: str = Depends(verify_token)):
     return {"msg": "Secure data accessed!", "token": token}
 ```
 
-✔️ Here, FastAPI **runs `verify_token` first**, and if it passes, injects the return value into the endpoint.
+✔️ FastAPI:
+
+1. Calls `verify_token` before endpoint runs.
+2. Injects its result (`token`) into the endpoint.
 
 ---
 
-### Short Sample Project with `Depends`
+### 4. Advanced Uses
 
-Let’s build a **User CRUD API** with:
-
-- **Dependency Injection for DB sessions**
-- **Dependency Injection for fake authentication**
-
-#### Project Structure
-
-```
-app/
- ├── main.py
- ├── database.py
- ├── models.py
- ├── schemas.py
- └── crud.py
-```
-
----
-
-#### 1. `database.py`
+#### (a) Database Session
 
 ```python
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import Session
+from database import SessionLocal
 
-DATABASE_URL = "sqlite:///./test.db"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Dependency for DB session
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+@app.get("/users/")
+def get_users(db: Session = Depends(get_db)):
+    return db.query(User).all()
+```
+
+#### (b) Authentication
+
+```python
+def get_current_user(token: str = Depends(verify_token)):
+    return {"username": "admin"}
+```
+
+#### (c) Reusable Query Parameters
+
+```python
+def common_params(skip: int = 0, limit: int = 10):
+    return {"skip": skip, "limit": limit}
+
+@app.get("/items/")
+def list_items(params: dict = Depends(common_params)):
+    return {"params": params}
 ```
 
 ---
 
-#### 2. `models.py`
+### 5. Nested Dependencies
+
+Dependencies can depend on other dependencies:
 
 ```python
-from sqlalchemy import Column, Integer, String
-from .database import Base
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    email = Column(String, unique=True, index=True)
-```
-
----
-
-#### 3. `schemas.py`
-
-```python
-from pydantic import BaseModel
-
-class UserCreate(BaseModel):
-    name: str
-    email: str
-
-class UserOut(BaseModel):
-    id: int
-    name: str
-    email: str
-
-    class Config:
-        orm_mode = True
-```
-
----
-
-#### 4. `crud.py`
-
-```python
-from sqlalchemy.orm import Session
-from . import models, schemas
-
-def create_user(db: Session, user: schemas.UserCreate):
-    db_user = models.User(name=user.name, email=user.email)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-def get_users(db: Session):
-    return db.query(models.User).all()
-```
-
----
-
-#### 5. `main.py`
-
-```python
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from . import models, schemas, crud, database
-
-models.Base.metadata.create_all(bind=database.engine)
-app = FastAPI()
-
-# Fake auth dependency
-def get_current_user(token: str = "test123"):
+def get_token_header(token: str = "test123"):
     if token != "test123":
-        raise HTTPException(status_code=403, detail="Invalid token")
+        raise HTTPException(403, "Invalid Token")
+    return token
+
+def get_current_user(token: str = Depends(get_token_header)):
     return {"username": "admin"}
 
-@app.post("/users/", response_model=schemas.UserOut)
-def create_user(user: schemas.UserCreate,
-                db: Session = Depends(database.get_db),
-                current_user: dict = Depends(get_current_user)):
-    return crud.create_user(db, user)
-
-@app.get("/users/", response_model=list[schemas.UserOut])
-def read_users(db: Session = Depends(database.get_db),
-               current_user: dict = Depends(get_current_user)):
-    return crud.get_users(db)
+@app.get("/profile/")
+def profile(user: dict = Depends(get_current_user)):
+    return user
 ```
 
----
-
-### How `Depends` Works Here
-
-1. **`Depends(database.get_db)`** → creates and closes DB session automatically.
-2. **`Depends(get_current_user)`** → ensures only authenticated users can access endpoints.
-3. FastAPI **injects these automatically** into your endpoint function.
+Flow: **Request → get_token_header → get_current_user → endpoint**
 
 ---
 
-Now, you have:
+### 6. Key Benefits in FastAPI
 
-- `/users/ [POST]` → Create user (requires token).
-- `/users/ [GET]` → List users (requires token).
+- ✅ Runs dependencies **before endpoint**
+- ✅ Injects results automatically
+- ✅ Supports **async and sync**
+- ✅ Plays nicely with Pydantic (validation + DI)
+- ✅ Auto-docs include dependencies
+
+---
+
+### 7. How FastAPI Uses `Depends` Under the Hood
+
+**Request cycle with `Depends`:**
+
+```
+Client Request
+     ↓
+FastAPI Router
+     ↓
+Evaluate Dependencies (via Depends)
+     ↓
+Inject Dependency Results into Endpoint
+     ↓
+Run Endpoint Logic
+     ↓
+Return Response
+```

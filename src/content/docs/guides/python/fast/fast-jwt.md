@@ -3,7 +3,7 @@ title: Fast JWT
 slug: guides/python/fast/fast-jwt
 description: Fast JWT
 sidebar:
-  order: 10
+  order: 8
 ---
 
 **JWT Authentication in FastAPI**

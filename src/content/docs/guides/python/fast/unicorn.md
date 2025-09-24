@@ -3,7 +3,7 @@ title: Uvicorn vs Gunicorn
 slug: guides/python/fast/unicorn
 description: Uvicorn vs Gunicorn
 sidebar:
-  order: 3
+  order: 20
 ---
 
 #### What is Uvicorn?

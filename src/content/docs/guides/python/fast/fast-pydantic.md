@@ -1,9 +1,9 @@
 ---
-title: Fast with Pydantic
-slug: guides/python/fast/pydantic
-description: Fast with Pydantic
+title: Fast Pydantic
+slug: guides/python/fast/fast-pydantic
+description: Fast Pydantic
 sidebar:
-  order: 6
+  order: 3
 ---
 
 - 👉 **Without Pydantic, FastAPI would just be another web framework.**

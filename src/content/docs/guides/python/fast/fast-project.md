@@ -3,7 +3,7 @@ title: Fast Project Structure
 slug: guides/python/fast/fast-project
 description: Fast Project Structure
 sidebar:
-  order: 10
+  order: 0
 ---
 
 Scaling a FastAPI project means moving from a **single `main.py` file** to a **well-organized, modular folder structure**.
