@@ -8,7 +8,8 @@ sidebar:
 
 #### What is Uvicorn?
 
-**Uvicorn** is an **ASGI (Asynchronous Server Gateway Interface) server** implementation for Python. It's specifically designed to work with async web frameworks like FastAPI, Starlette, and Django 3.0+.
+- **Uvicorn** is an **ASGI (Asynchronous Server Gateway Interface) server** implementation for Python.
+- Designed to work with **async web frameworks** like **FastAPI**, **Starlette**, and Django 3.0+.
 
 #### Key Characteristics:
 

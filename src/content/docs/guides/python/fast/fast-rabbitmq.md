@@ -34,7 +34,7 @@ Start server:
 rabbitmq-server
 ```
 
-Management UI at → [http://localhost:15672](http://localhost:15672) (default: guest/guest).
+Management UI at → `http://`localhost:15672 (default: guest/guest).
 
 ---
 
