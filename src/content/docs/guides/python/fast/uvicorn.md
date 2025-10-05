@@ -1,6 +1,6 @@
 ---
 title: Uvicorn vs Gunicorn
-slug: guides/python/fast/unicorn
+slug: guides/python/fast/uvicorn
 description: Uvicorn vs Gunicorn
 sidebar:
   order: 20

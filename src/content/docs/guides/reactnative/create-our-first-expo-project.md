@@ -29,8 +29,10 @@ npx rn-new@latest expo-starter --expo-router --tabs --nativewind --zustand --sup
 <summary>Details</summary>
 
 ```bash
+
+
 # To create a new project
-pnpm create expo-app@latest -t
+pnpm create expo-app@latest
 
 pnpm create expo-app@latest my-app -t blank-typescript
 

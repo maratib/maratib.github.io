@@ -44,6 +44,11 @@ export default defineConfig({
           autogenerate: { directory: "guides/basics" },
         },
         {
+          label: "Angular",
+          collapsed: true,
+          autogenerate: { directory: "guides/angular" },
+        },
+        {
           label: "SQL",
           collapsed: true,
           autogenerate: { directory: "guides/sql" },
@@ -109,6 +114,13 @@ export default defineConfig({
               },
             },
              {
+              label: "Django",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/python/django",
+              },
+            },
+             {
               label: "SQLAlchemy ORM",
               collapsed: true,
               autogenerate: {
@@ -116,6 +128,11 @@ export default defineConfig({
               },
             },
            ]
+        },
+        {
+          label: "Kotlin",
+          collapsed: true,
+          autogenerate: { directory: "guides/kotlin" },
         },
         {
           label: "Java",

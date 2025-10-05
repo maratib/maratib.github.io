@@ -13,6 +13,7 @@ A SQL `JOIN` clause is used to **combine rows from two or more tables** based on
 **Core Concept:** A JOIN horizontally combines data from multiple tables into a single, wider result set.
 
 ### Basic Syntax:
+
 ```sql
 SELECT column_list
 FROM table_1
@@ -38,14 +39,16 @@ JOINs are the fundamental operation in relational databases, designed to elimina
 The type of JOIN you use is determined by the question you need to answer.
 
 ### A. INNER JOIN
-*   **When to use:** When you only want rows where there is a **match in both tables**. This is the most common type of JOIN.
-*   **What it does:** It returns records that have matching values in both tables. Non-matching rows from both tables are discarded.
+
+- **When to use:** When you only want rows where there is a **match in both tables**. This is the most common type of JOIN.
+- **What it does:** It returns records that have matching values in both tables. Non-matching rows from both tables are discarded.
 
 **Example:** Get a list of all employees who are assigned to a department, along with their department name.
+
 ```sql
 SELECT e.first_name, e.last_name, d.department_name
 FROM employees e
-INNER JOIN departments d 
+INNER JOIN departments d
     ON e.department_id = d.department_id;
 ```
 
@@ -81,14 +84,16 @@ flowchart LR
 ```
 
 ### B. LEFT (OUTER) JOIN
-*   **When to use:** When you want **all records from the left table (first table mentioned)**, and the matched records from the right table. If there is no match, the result set will contain `NULL` values from the right table.
-*   **What it does:** "Return me all employees, and if they have a department, give me that too."
+
+- **When to use:** When you want **all records from the left table (first table mentioned)**, and the matched records from the right table. If there is no match, the result set will contain `NULL` values from the right table.
+- **What it does:** "Return me all employees, and if they have a department, give me that too."
 
 **Example:** Get a list of ALL employees, and show their department name if they have one.
+
 ```sql
 SELECT e.first_name, e.last_name, d.department_name
 FROM employees e
-LEFT JOIN departments d 
+LEFT JOIN departments d
     ON e.department_id = d.department_id;
 ```
 
@@ -127,8 +132,8 @@ flowchart LR
 
 ### C. Other JOIN Types
 
-*   **RIGHT (OUTER) JOIN:** The reverse of a `LEFT JOIN`. It returns all records from the right table and the matched records from the left table. Less commonly used because you can usually change the table order and use a `LEFT JOIN`.
-*   **FULL (OUTER) JOIN:** Returns all records when there is a match in either the left or right table. It's a combination of both `LEFT` and `RIGHT` joins. If there's no match, missing sides are filled with `NULL`.
+- **RIGHT (OUTER) JOIN:** The reverse of a `LEFT JOIN`. It returns all records from the right table and the matched records from the left table. Less commonly used because you can usually change the table order and use a `LEFT JOIN`.
+- **FULL (OUTER) JOIN:** Returns all records when there is a match in either the left or right table. It's a combination of both `LEFT` and `RIGHT` joins. If there's no match, missing sides are filled with `NULL`.
 
 ---
 
@@ -136,32 +141,35 @@ flowchart LR
 
 This is a key decision point. Here’s a direct comparison and when to choose which.
 
-| Feature | JOINs | Subqueries |
-| :--- | :--- | :--- |
-| **Primary Use** | **Combining** columns from multiple tables into a new result set. | **Filtering** or **providing a value** based on the result of another query. |
-| **Result Set** | **Horizontal** combination (more columns). | Often used for a **vertical** or **scalar** operation (e.g., filtering a list of rows, getting a single value). |
-| **Performance** | **Generally faster** for combining data, especially on large datasets with proper indexes. | Can be **slower**, especially correlated subqueries that execute once per row. |
-| **Readability** | Very clear for expressing **relationships between tables**. | Very clear for expressing **step-by-step logic** or **conditional filters**. |
-| **Must Use** | When you need **columns from multiple tables** in your final select list. | When you need to **use an aggregate function (MAX, AVG) in a filter** (`WHERE salary > AVG(salary)`). |
+| Feature         | JOINs                                                                                      | Subqueries                                                                                                      |
+| :-------------- | :----------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
+| **Primary Use** | **Combining** columns from multiple tables into a new result set.                          | **Filtering** or **providing a value** based on the result of another query.                                    |
+| **Result Set**  | **Horizontal** combination (more columns).                                                 | Often used for a **vertical** or **scalar** operation (e.g., filtering a list of rows, getting a single value). |
+| **Performance** | **Generally faster** for combining data, especially on large datasets with proper indexes. | Can be **slower**, especially correlated subqueries that execute once per row.                                  |
+| **Readability** | Very clear for expressing **relationships between tables**.                                | Very clear for expressing **step-by-step logic** or **conditional filters**.                                    |
+| **Must Use**    | When you need **columns from multiple tables** in your final select list.                  | When you need to **use an aggregate function (MAX, AVG) in a filter** (`WHERE salary > AVG(salary)`).           |
 
 ### When to Choose Which:
 
-*   **Use a JOIN when:**
-    > **"Show me details from multiple tables."**
-    *   You need to display columns from Table A and Table B.
-    *   *Example: "Get employee names and their department names."*
+- **Use a JOIN when:**
 
-*   **Use a Subquery when:**
-    > **"Filter this table based on a complex condition from another table."**
-    *   You are filtering in the `WHERE` clause using a condition that requires a separate `SELECT` (especially with aggregates).
-    *   *Example: "Find all employees who earn more than the average salary."*
-    *   *Example: "Find products that have never been ordered." (Using `NOT IN` or `NOT EXISTS`)*
+  > **"Show me details from multiple tables."**
+
+  - You need to display columns from Table A and Table B.
+  - _Example: "Get employee names and their department names."_
+
+- **Use a Subquery when:**
+  > **"Filter this table based on a complex condition from another table."**
+  - You are filtering in the `WHERE` clause using a condition that requires a separate `SELECT` (especially with aggregates).
+  - _Example: "Find all employees who earn more than the average salary."_
+  - _Example: "Find products that have never been ordered." (Using `NOT IN` or `NOT EXISTS`)_
 
 ### Interchangeable Example (The Interview Question):
 
 **Question: "Find all employees who work in the 'Sales' department."**
 
 **Solution 1: Using a JOIN (Usually Preferred)**
+
 ```sql
 SELECT e.employee_id, e.first_name, e.last_name
 FROM employees e
@@ -170,6 +178,7 @@ WHERE d.department_name = 'Sales';
 ```
 
 **Solution 2: Using a Subquery**
+
 ```sql
 SELECT employee_id, first_name, last_name
 FROM employees
@@ -187,6 +196,7 @@ WHERE department_id IN (
 ## 5. Advanced JOIN Concepts
 
 1.  **Joining More Than Two Tables:**
+
     ```sql
     SELECT e.first_name, e.last_name, d.department_name, l.city
     FROM employees e
@@ -196,6 +206,7 @@ WHERE department_id IN (
 
 2.  **Self-JOIN:** Joining a table to itself. Crucial for hierarchical data or comparing rows within the same table.
     **Example: "Find each employee's manager's name."**
+
     ```sql
     SELECT emp.first_name AS Employee,
            mgr.first_name AS Manager
