@@ -318,7 +318,7 @@ celery -A config worker --loglevel=info
 celery -A config flower --port=5555
 ```
 
-Access Flower at: http://localhost:5555
+Access Flower at: http: //localhost:5555
 
 ## Step 9: Test Celery Tasks
 
