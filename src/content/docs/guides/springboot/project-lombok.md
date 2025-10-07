@@ -1,58 +1,17 @@
 ---
 title: Project Lombok
-slug: guides/spring-boot/project-lombok
 description: Project Lombok
-sidebar:
-  order: 5
 ---
-
-**Project Lombok - Complete Guide**
-
-## What is Project Lombok?
 
 Project Lombok is a Java library that automatically plugs into your editor and build tools, spicing up your Java code. It helps you eliminate boilerplate code like getters, setters, constructors, equals, hashCode, toString methods, and more through annotations.
 
-## 1. Setup and Installation
-
-### Maven Dependency
-
-```xml
-<dependency>
-    <groupId>org.projectlombok</groupId>
-    <artifactId>lombok</artifactId>
-    <version>1.18.30</version>
-    <scope>provided</scope>
-</dependency>
-```
-
-### Gradle Dependency
-
-```gradle
-dependencies {
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-    annotationProcessor 'org.projectlombok:lombok:1.18.30'
-}
-```
-
 ### IDE Setup
-
-**IntelliJ IDEA:**
-
-1. Install "Lombok" plugin from Marketplace
-2. Enable annotation processing:
-   - Settings → Build → Compiler → Annotation Processors → Enable annotation processing
-
-**Eclipse:**
-
-1. Download lombok.jar
-2. Run: `java -jar lombok.jar`
-3. Follow the installation wizard
 
 **VSCode:**
 
 1. [Install Lombok extension](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-lombok)
 
-## 2. Core Annotations
+## 1. Core Annotations
 
 ### @Getter and @Setter
 
@@ -290,7 +249,7 @@ ImmutableUser user = ImmutableUser.builder()
 ImmutableUser olderUser = user.withAge(26);
 ```
 
-## 3. Advanced Features
+## 2. Advanced Features
 
 ### @Slf4j, @Log, etc.
 
@@ -439,7 +398,7 @@ class CleanupExampleWithoutLombok {
 }
 ```
 
-## 4. Configuration and Customization
+## 3. Configuration and Customization
 
 ### lombok.config
 
@@ -477,7 +436,7 @@ public class ConstantsExample {
 String fieldName = ConstantsExample.Fields.firstName; // "firstName"
 ```
 
-## 5. Practical Examples
+## 4. Practical Examples
 
 ### JPA Entity with Lombok
 
@@ -578,7 +537,7 @@ public class UserService {
 }
 ```
 
-## 6. Common Patterns and Best Practices
+## 5. Common Patterns and Best Practices
 
 ### Immutable Configuration Classes
 
@@ -648,7 +607,7 @@ public class Point {
 }
 ```
 
-## 7. Testing with Lombok
+## 6. Testing with Lombok
 
 ### Test Classes
 
@@ -679,7 +638,7 @@ class UserServiceTest {
 }
 ```
 
-## 8. Common Pitfalls and Solutions
+## 7. Common Pitfalls and Solutions
 
 ### Circular References in @ToString
 
@@ -741,7 +700,7 @@ class User extends BaseEntity {
 }
 ```
 
-## 9. Lombok with Spring Boot
+## 8. Lombok with Spring Boot
 
 ### Complete Spring Boot Example
 
@@ -834,7 +793,7 @@ public class ProductController {
 }
 ```
 
-## 10. Migration Tips
+## 9. Migration Tips
 
 ### Before Lombok
 

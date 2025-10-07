@@ -184,8 +184,12 @@ export default defineConfig({
               link: "guides/springboot/request-life-cycle",
             },
             {
-              label: "Layered Architecture ",
+              label: "Layered Architecture",
               link: "guides/springboot/layered-architecture",
+            },
+            {
+              label: "Project Lombok",
+              link: "guides/springboot/project-lombok",
             },
             {
               label: "JPA",
