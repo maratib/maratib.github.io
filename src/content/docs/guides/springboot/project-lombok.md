@@ -48,6 +48,10 @@ dependencies {
 2. Run: `java -jar lombok.jar`
 3. Follow the installation wizard
 
+**VSCode:**
+
+1. [Install Lombok extension](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-lombok)
+
 ## 2. Core Annotations
 
 ### @Getter and @Setter
