@@ -6,13 +6,15 @@ sidebar:
   order: 5
 ---
 
-- **Signals** are reactive primitives introduced in Angular 16+ that contain values and notify consumers when those values change.
+- **Signals are the `building blocks` of modern Angular's `reactivity system`**.
 
-- They form the foundation of Angular's new reactive system, providing granular change detection and better performance.
+- **Think of them as** `reactive containers` that `hold values` and `automatically notify` the dependents `when they change`.
 
-- **Signals are the building blocks of Angular's reactivity system**. Think of them as **"reactive variables"** that automatically notify anything depending on them when their value changes.
+- **Used to maintain** the `state` in angular 16+.
 
-- Unlike traditional variables, signals maintain a list of dependencies and proactively update them, making state management more predictable and efficient.
+- Providing `granular change detection` and `better performance`.
+
+_Unlike traditional variables, signals maintain a list of dependencies and proactively update them, making state management more predictable and efficient._
 
 ### Key Characteristics of Signals:
 

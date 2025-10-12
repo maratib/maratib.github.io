@@ -6,7 +6,7 @@ sidebar:
   order: 9
 ---
 
-- **Subjects in Angular** are part of the **RxJS (Reactive Extensions for JavaScript)** library and are essential for reactive programming.
+- **Subjects in Angular** are part of the **RxJS** library and are `essential for reactive programming`.
 - A **Subject** is a special type of **Observable** that acts as both an **Observer** and an **Observable**.
 
 - This dual nature allows it to:
