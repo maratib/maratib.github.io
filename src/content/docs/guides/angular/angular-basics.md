@@ -3,7 +3,7 @@ title: Angular Basics
 slug: guides/angular/angular-basics
 description: Angular Basics
 sidebar:
-  order: 3
+  order: 0
 ---
 
 ## **1. Components (Standalone)**

@@ -5,7 +5,7 @@ import starlightThemeGalaxy from "starlight-theme-galaxy";
 
 import starlightBlog from "starlight-blog";
 import starlightLinksValidator from "starlight-links-validator";
-import starlightImageZoom from 'starlight-image-zoom'
+import starlightImageZoom from "starlight-image-zoom";
 import mermaid from "astro-mermaid";
 
 // https://astro.build/config
@@ -15,7 +15,7 @@ export default defineConfig({
     starlight({
       title: "maratib",
       favicon: "favicon.ico",
-      customCss: ['./src/assets/css/styles.scss'],
+      customCss: ["./src/assets/css/styles.scss"],
       logo: {
         src: "./src/assets/img/houston.webp",
         alt: "Maratib Ali Khan",
@@ -81,53 +81,53 @@ export default defineConfig({
               label: "Typescript for React",
               link: "guides/typescript/typescript-for-react",
             },
-          ]
+          ],
         },
-         {
+        {
           label: "Python",
           collapsed: true,
-           items: [
-             {
+          items: [
+            {
               label: "Python Basics",
               link: "guides/python/python-basics",
             },
-             {
+            {
               label: "Dunder Methods",
               link: "guides/python/dunder-methods",
             },
-             {
+            {
               label: "Python OOP",
               link: "guides/python/python-oops",
             },
-             {
+            {
               label: "Flask",
               collapsed: true,
               autogenerate: {
                 directory: "guides/python/flask",
               },
             },
-             {
+            {
               label: "Fast API",
               collapsed: true,
               autogenerate: {
                 directory: "guides/python/fast",
               },
             },
-             {
+            {
               label: "Django",
               collapsed: true,
               autogenerate: {
                 directory: "guides/python/django",
               },
             },
-             {
+            {
               label: "SQLAlchemy ORM",
               collapsed: true,
               autogenerate: {
                 directory: "guides/python/alchemy",
               },
             },
-           ]
+          ],
         },
         {
           label: "Kotlin",
@@ -138,7 +138,6 @@ export default defineConfig({
           label: "Java",
           collapsed: true,
           items: [
-
             {
               label: "OOP Design Patterns",
               link: "guides/java/oop-design-patterns",
@@ -154,8 +153,7 @@ export default defineConfig({
                 directory: "guides/java/hibernate",
               },
             },
-
-          ]
+          ],
         },
         {
           label: "J2EE",
@@ -296,6 +294,11 @@ export default defineConfig({
               },
             },
           ],
+        },
+        {
+          label: "Express",
+          collapsed: true,
+          autogenerate: { directory: "guides/express" },
         },
         {
           label: "Starlight",
