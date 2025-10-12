@@ -6,9 +6,20 @@ sidebar:
   order: 6
 ---
 
-Pipes are simple functions that transform input values to output values for display in templates. They're used in template expressions to format data.
+- **Pipes** are `simple functions` that `transform input values to output values for display in templates`.
+- They are `used in template expressions` to `format data`.
 
-## Built-in Pipes
+### Pure vs Impure Pipes - Key Differences
+
+| Aspect      | Pure Pipe                           | Impure Pipe                            |
+| ----------- | ----------------------------------- | -------------------------------------- |
+| Execution   | Only on pure change                 | Every change detection                 |
+| Performance | Optimized                           | Potentially slow                       |
+| Use Case    | Primitive values, immutable objects | Arrays/objects with internal mutations |
+| State       | Stateless                           | Can be stateful                        |
+
+<details>
+<summary>Built-in Pipes</summary>
 
 ```typescript
 // Template usage
@@ -22,26 +33,10 @@ Pipes are simple functions that transform input values to output values for disp
 {{ items | array | json }}  // JSON representation
 ```
 
-## Pure vs Impure Pipes
+</details>
 
-<table width="100%">
-<tr><th>Pure</th><th>Impure</th></tr>
-
-<tr>
-<td valign="top">
-
-- **Only runs when input reference changes**
-- **Performance optimized**
-- **Stateless**
-</td><td valign="top">
-
-- **Runs on every change detection cycle**
-- **Use sparingly - performance impact**
-- **Needed for arrays/objects when internal changes matter**
-</td></tr>
-</table>
-
-### Pure Pipes (Default)
+<details>
+<summary>Pure Pipes (Default)</summary>
 
 ```typescript
 @Pipe({
@@ -63,7 +58,10 @@ export class PureExamplePipe implements PipeTransform {
 }
 ```
 
-### Impure Pipes
+</details>
+
+<details>
+<summary>Impure Pipes</summary>
 
 ```typescript
 @Pipe({
@@ -85,16 +83,10 @@ export class ImpureExamplePipe implements PipeTransform {
 }
 ```
 
-## Key Differences
+</details>
 
-| Aspect      | Pure Pipe                           | Impure Pipe                            |
-| ----------- | ----------------------------------- | -------------------------------------- |
-| Execution   | Only on pure change                 | Every change detection                 |
-| Performance | Optimized                           | Potentially slow                       |
-| Use Case    | Primitive values, immutable objects | Arrays/objects with internal mutations |
-| State       | Stateless                           | Can be stateful                        |
-
-## Creating Custom Pipes
+<details>
+<summary>Creating Custom Pipes</summary>
 
 ### 1. Basic Custom Pipe
 
@@ -281,9 +273,11 @@ export class FileSizePipe implements PipeTransform {
 {{ file.size | fileSize:1 }}      // 1.4 MB
 ```
 
-## Registering Pipes
+</details>
 
-### Module Registration
+<details>
+<summary>Registering Pipes</summary>
+#### Module Registration
 
 ```typescript
 // app.module.ts
@@ -314,7 +308,10 @@ export class AppModule {}
 export class MyComponent {}
 ```
 
-## Best Practices
+</details>
+
+<details>
+<summary>Best Practices</summary>
 
 ### 1. Prefer Pure Pipes
 
@@ -376,7 +373,10 @@ export class SafeDisplayPipe implements PipeTransform {
 }
 ```
 
-## Performance Considerations
+</details>
+
+<details>
+<summary>Performance Considerations</summary>
 
 ### Pure Pipe Optimization
 
@@ -406,7 +406,10 @@ export class ExpensivePipe implements PipeTransform {
 }
 ```
 
-## Testing Pipes
+</details>
+
+<details>
+<summary>Testing Pipes</summary>
 
 ```typescript
 // reverse.pipe.spec.ts
@@ -433,7 +436,9 @@ describe("ReversePipe", () => {
 });
 ```
 
-## Summary
+</details>
+
+### Summary
 
 **When to use Pipes:**
 
@@ -453,4 +458,4 @@ describe("ReversePipe", () => {
 - **Use Impure** only when you need to detect changes within arrays/objects
 - **Be careful** with impure pipes - they run frequently!
 
-Pipes are powerful for template data transformation but should be used judiciously to maintain performance.
+_Pipes are powerful for template data transformation but should be used judiciously to maintain performance._

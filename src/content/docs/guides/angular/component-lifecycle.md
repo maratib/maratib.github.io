@@ -6,9 +6,9 @@ sidebar:
   order: 2
 ---
 
-Lifecycle hooks are methods that Angular calls at specific points in a component's existence, from creation to destruction.
+**Lifecycle hooks are methods** that `Angular calls` at `specific points` in a `component's existence`, from `creation` to `destruction`.
 
-## Quick Reference (Most Commonly Used)
+### Quick Reference (Most Commonly Used)
 
 | Hook              | Purpose       | Best For                                           |
 | ----------------- | ------------- | -------------------------------------------------- |
@@ -20,29 +20,57 @@ Lifecycle hooks are methods that Angular calls at specific points in a component
 
 ### The Complete Lifecycle Sequence
 
-#### 1. Creation Phase:
+#### 1. **Creation Phase:** (Constructor -> ngOnChanges -> ngOnInit)
 
-- **Constructor:** This is the first method called when an instance of the component class is created. It is used for basic initialization of properties and dependency injection.
+- **Constructor:**
 
-- **ngOnChanges:** This hook is called before ngOnInit and whenever one or more data-bound input properties change. It receives a SimpleChanges object containing the current and previous values of the changed properties.
-- **ngOnInit:** This hook is called once, after the first ngOnChanges and after Angular has initialized all data-bound properties of a directive or component. It is a common place to perform initialization logic, such as fetching data from an API.
+  - Called when an `instance of the component class is created`.
+  - Used for `basic initialization of properties` and `dependency injection`.
+
+- **ngOnChanges:**
+
+  - `before ngOnInit` and whenever `one or more data-bound input properties change`.
+  - It receives a SimpleChanges object containing the current and previous values.
+
+- **ngOnInit:**
+  - `This hook is called once`, after the first ngOnChanges and after Angular has initialized all data-bound properties of a directive or component.
+  - It is a common place to perform initialization logic, such as fetching data from an API.
 
 #### 2. Content Projection and View Initialization:
 
-- **ngDoCheck:** This hook is called during every change detection cycle, immediately after ngOnChanges and ngOnInit. It allows you to implement custom change detection logic or perform actions that need to run frequently.
+- **ngDoCheck:**
 
-- **ngAfterContentInit:** This hook is called once after Angular has projected external content into the component's view. It is used to perform initialization logic related to projected content.
-- **ngAfterContentChecked:** This hook is called after Angular checks the content projected into the component. It is used to perform actions after the projected content has been checked for changes.
-- **ngAfterViewInit:** This hook is called once after Angular initializes the component's view and its child views. It is typically used for DOM manipulation or interacting with child components.
-- **ngAfterViewChecked:** This hook is called after Angular checks the component's view and its child views. It is used to perform actions after the view has been checked for changes.
+  - `This hook is called during every change detection cycle`, immediately after ngOnChanges and ngOnInit.
+  - It allows you to `implement custom change detection logic or perform actions` that need to run frequently.
+
+- **ngAfterContentInit:**
+
+  - `This hook is called once after Angular has projected external content into the component's view`.
+  - It is used to perform initialization logic related to projected content.
+
+- **ngAfterContentChecked:**
+
+  - This hook is called after Angular checks the content projected into the component.
+  - It is used to perform actions after the projected content has been checked for changes.
+
+- **ngAfterViewInit:**
+
+  - This hook is called once after Angular initializes the component's view and its child views.
+  - It is typically used for DOM manipulation or interacting with child components.
+
+- **ngAfterViewChecked:**
+  - This hook is called after Angular checks the component's view and its child views.
+  - It is used to perform actions after the view has been checked for changes.
 
 #### 3. Destruction Phase:
 
-- **ngOnDestroy:** This hook is called just before Angular destroys the component. It is used to perform cleanup tasks, such as unsubscribing from observables, clearing timers, or detaching event listeners, to prevent memory leaks.
+- **ngOnDestroy:**
+  - This hook is called `just before Angular destroys the component`.
+  - It is used to perform cleanup tasks, such as unsubscribing from observables, clearing timers, or detaching event listeners, to prevent memory leaks.
 
-#### Note on afterRenderEffect:
+### Note on `afterRenderEffect` new hook:
 
-Angular 19 introduced **afterRenderEffect**,
+_Angular 19 introduced **`afterRenderEffect`**,_
 
 - which is a new feature for executing tasks after the rendering is complete.
 - While not a traditional lifecycle hook, it provides a powerful mechanism to ensure certain actions are performed once the DOM has been fully updated.
@@ -109,9 +137,9 @@ export class DataComponent implements OnDestroy {
 }
 ```
 
-## Less Common (But Important) Hooks
+### Less Common (But Important) Hooks
 
-### 4. `ngAfterViewInit()`
+#### 4. `ngAfterViewInit()`
 
 Respond after Angular initializes the component's views and child views
 
@@ -126,7 +154,7 @@ export class ChartComponent implements AfterViewInit {
 }
 ```
 
-### 5. `ngDoCheck()`
+#### 5. `ngDoCheck()`
 
 Detect and act upon changes that Angular can't or won't detect on its own
 
@@ -144,7 +172,7 @@ export class ListComponent implements DoCheck {
 }
 ```
 
-## Modern Angular 19+ with Signals
+### Modern Angular 19+ with Signals
 
 ```typescript
 @Component({
@@ -182,7 +210,7 @@ export class UserProfileComponent implements OnInit, OnDestroy {
 }
 ```
 
-## Hook Execution Order Example
+### Hook Execution Order Example
 
 ```typescript
 export class LifecycleDemoComponent
@@ -216,7 +244,7 @@ export class LifecycleDemoComponent
 }
 ```
 
-## Best Practices
+### Best Practices
 
 1. **Use `ngOnInit`** for initialization logic (not constructor)
 2. **Use `ngOnDestroy`** to unsubscribe from observables and prevent memory leaks

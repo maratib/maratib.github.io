@@ -6,9 +6,12 @@ sidebar:
   order: 4
 ---
 
-**Binding in Angular** is the automatic **synchronization of data** between the component class and the **template**, keeping your **UI in sync** with your **application state**.
+- **Binding in Angular** is the automatic **`synchronization of data`** between the component class and the **`template`**,
+- It keeps your **UI in sync** with your **application state**.
 
-It connects your **TypeScript logic** with your **HTML view** through various syntaxes like `{{ }}`, `[ ]`, and `( )`.
+- It connects your **TypeScript logic** with your **HTML view** through various syntaxes
+
+  - like `{{ }}`, `[ ]`, and `( )`.
 
 | Biding    | Name.         | Example                            |
 | --------- | ------------- | ---------------------------------- |

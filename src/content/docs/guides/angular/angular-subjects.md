@@ -25,7 +25,7 @@ There are **four main types** of **Subjects**, each with distinct behavior regar
 
 ---
 
-## 1\. Subject
+### 1\. Subject
 
 The basic `Subject` is the simplest form. It acts as an event emitter and a multicast Observable.
 
@@ -67,7 +67,7 @@ Subscriber 2: 4
 
 ---
 
-## 2\. BehaviorSubject
+### 2\. BehaviorSubject
 
 A `BehaviorSubject` is an extension of `Subject` that has a notion of "current value."
 
@@ -106,7 +106,7 @@ Subscriber 2: 2
 
 ---
 
-## 3\. ReplaySubject
+### 3\. ReplaySubject
 
 A `ReplaySubject` is an extension of `Subject` that can record a sequence of values and replay them to new subscribers.
 
@@ -148,7 +148,7 @@ Subscriber 1: 4
 
 ---
 
-## 4\. AsyncSubject
+### 4\. AsyncSubject
 
 An `AsyncSubject` is a specialized Subject that only emits the **last value** emitted to its subscribers, and **only when the Observable completes**.
 
@@ -183,7 +183,7 @@ Subscriber 1: 3
 
 ---
 
-## Summary Table
+### Summary Table
 
 | Type                | Initial Value Required? | New Subscribers Receive...                         | Key Use Case                                          |
 | :------------------ | :---------------------- | :------------------------------------------------- | :---------------------------------------------------- |

@@ -10,15 +10,51 @@ sidebar:
 
 - Understanding **Observable, Observer, and Subscription is crucial** for building modern, reactive Angular applications.
 
-## 1. Observable
-
-### What is an Observable?
+#### What is an Observable?
 
 - An **Observable** represents a **stream of values** that can be **observed over time**.
-
 - It's a **lazy collection** that can emit multiple values synchronously or asynchronously.
 
-### Creating Observables in Angular
+#### What is an Observer?
+
+- An Observer is a consumer of values delivered by an Observable.
+- It's an object with next, error, and complete methods.
+
+#### What is a Subscription?
+
+- A Subscription represents the execution of an Observable.
+- It's used to unsubscribe from the Observable, preventing memory leaks.
+
+### Cold vs Hot Observables
+
+| Aspect               | Cold Observable                                   | Hot Observable                                     |
+| -------------------- | ------------------------------------------------- | -------------------------------------------------- |
+| **Data Production**  | Creates new data source for each subscriber       | Shares single data source among all subscribers    |
+| **Execution Start**  | Starts when subscribed (`lazy`)                   | Runs immediately (eager) regardless of subscribers |
+| **Data Consistency** | Each subscriber gets complete data from beginning | Late subscribers miss previous emissions           |
+| **Common Examples**  | `HttpClient` requests, `of()`, `from()`           | DOM events, WebSocket connections, `Subjects`      |
+| **Use Case**         | When each subscriber needs independent execution  | When subscribers should share the same data stream |
+
+#### **Cold observables**
+
+- `Are like YouTube videos` - each subscriber starts playback from the beginning independently,
+- Cold observables create new data producers for each subscription (making HTTP calls, reading files)
+
+#### **Hot observables**
+
+- `Are like live TV broadcasts` - all subscribers watch the same stream simultaneously and latecomers miss what already aired.
+- Whereas hot observables share a single data producer among all subscribers (DOM events, WebSockets, Subjects),
+
+_Cold is ideal for independent data requests and hot perfect for real-time event broadcasting._
+
+<details>
+<summary>Observable</summary>
+#### What is an Observable?
+
+- An **Observable** represents a **stream of values** that can be **observed over time**.
+- It's a **lazy collection** that can emit multiple values synchronously or asynchronously.
+
+#### Creating Observables in Angular
 
 ```typescript
 import { Observable } from "rxjs";
@@ -52,7 +88,7 @@ const intervalObservable = interval(1000); // Emit every second
 const eventObservable = fromEvent(document, "click"); // DOM events
 ```
 
-### Observable in Angular Services
+#### Observable in Angular Services
 
 ```typescript
 import { Injectable } from "@angular/core";
@@ -112,7 +148,7 @@ export class UserService {
 }
 ```
 
-### Cold vs Hot Observables
+#### Cold vs Hot Observables
 
 Cold observables start execution upon subscription, while hot observables emit regardless of subscriptions.
 
@@ -133,15 +169,16 @@ hotObservable.subscribe((value) => console.log("Sub2:", value));
 hotObservable.next(Math.random()); // Both get same value
 ```
 
----
+</details>
 
-## 2. Observer
+<details>
+<summary>Observer</summary>
+#### What is an Observer?
 
-### What is an Observer?
+- An Observer is a consumer of values delivered by an Observable.
+- It's an object with next, error, and complete methods.
 
-An Observer is a consumer of values delivered by an Observable. It's an object with next, error, and complete methods.
-
-### Observer Interface
+#### Observer Interface
 
 ```typescript
 interface Observer<T> {
@@ -151,7 +188,7 @@ interface Observer<T> {
 }
 ```
 
-### Creating Observers
+#### Creating Observers
 
 ```typescript
 // Complete Observer object
@@ -183,7 +220,7 @@ observable.subscribe({
 });
 ```
 
-### Practical Observer Examples in Angular
+#### Practical Observer Examples in Angular
 
 ```typescript
 import { Component } from "@angular/core";
@@ -237,7 +274,7 @@ export class UserListComponent {
 }
 ```
 
-### Error Handling with Observers
+#### Error Handling with Observers
 
 ```typescript
 @Injectable({ providedIn: "root" })
@@ -278,15 +315,17 @@ this.dataService.fetchDataWithRetry().subscribe({
 });
 ```
 
----
+</details>
 
-## 3. Subscription
+<details>
+<summary>Subscription</summary>
 
-### What is a Subscription?
+#### What is a Subscription?
 
-A Subscription represents the execution of an Observable. It's used to unsubscribe from the Observable, preventing memory leaks.
+- A Subscription represents the execution of an Observable.
+- It's used to unsubscribe from the Observable, preventing memory leaks.
 
-### Creating and Managing Subscriptions
+#### Creating and Managing Subscriptions
 
 ```typescript
 import { Subscription } from "rxjs";
@@ -340,7 +379,7 @@ export class SubscriptionComponent {
 }
 ```
 
-### Subscription Management Patterns
+#### Subscription Management Patterns
 
 ```typescript
 import { Component, OnDestroy, OnInit } from "@angular/core";
@@ -401,7 +440,7 @@ export class DataManagerComponent implements OnInit, OnDestroy {
 }
 ```
 
-### Real-world Subscription Scenarios
+#### Real-world Subscription Scenarios
 
 ```typescript
 @Component({
@@ -473,11 +512,11 @@ export class RealTimeDashboardComponent implements OnInit, OnDestroy {
 }
 ```
 
----
+</details>
 
-## 4. Practical Angular 19+ Patterns
-
-### HTTP Service with Observables
+<details>
+<summary>Practical Angular 19+ Patterns</summary>
+#### HTTP Service with Observables
 
 ```typescript
 import { Injectable } from "@angular/core";
@@ -551,7 +590,7 @@ export class ApiService {
 }
 ```
 
-### Component Communication with Subjects
+#### Component Communication with Subjects
 
 ```typescript
 import { Component, OnDestroy } from "@angular/core";
@@ -605,7 +644,7 @@ export class ComponentB implements OnDestroy {
 }
 ```
 
-### Form Handling with Observables
+#### Form Handling with Observables
 
 ```typescript
 import { Component, OnDestroy } from "@angular/core";
@@ -693,11 +732,12 @@ export class UserFormComponent implements OnDestroy {
 }
 ```
 
----
+</details>
 
-## 5. Best Practices for Angular 19+
+<details>
+<summary>Best Practices for Angular 19+</summary>
 
-### Memory Management
+#### Memory Management
 
 ```typescript
 @Component({
@@ -747,7 +787,7 @@ export class BestPracticesComponent implements OnDestroy {
 }
 ```
 
-### Performance Optimization
+#### Performance Optimization
 
 ```typescript
 @Injectable({ providedIn: "root" })
@@ -781,7 +821,7 @@ export class OptimizedService {
 }
 ```
 
-### Testing Observables
+#### Testing Observables
 
 ```typescript
 import { TestBed, fakeAsync, tick } from "@angular/core/testing";
@@ -833,9 +873,11 @@ describe("UserService", () => {
 });
 ```
 
-## Summary
+</details>
 
-### Key Takeaways:
+### Summary
+
+#### Key Takeaways:
 
 1. **Observables** are lazy data streams that can emit multiple values over time
 2. **Observers** consume observable values through next, error, and complete methods
