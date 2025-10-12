@@ -6,31 +6,23 @@ sidebar:
   order: 1
 ---
 
-- **Directives** are fundamental building blocks that allow you to **manipulate the DOM**.
+### Directives
 
-- **Directives** add new behavior to existing elements or modify their structure.
+- **Directives** are **`fundamental building blocks`** that allow you to **`manipulate the DOM`**.
+
+- **Directives** add **`new behavior`** to existing elements or **`modify`** their **`structure`**.
 
 - Every directive is marked with the **`@Directive()`** decorator.
 
-- There are **three** main **types** of **directives** in Angular:
+- There are **`three`** main **`types`** of **`directives`** in Angular:
 
-1. **Component Directives**
-
-   - a directive with a **template**
-
-2. **Structural Directives**
-
-- are responsible for **manipulating the DOM's structure**, (e.g **\*ngIf**, **\*ngFor**, **\*ngSwitch**)
-
-3. **Attribute Directives**
-
-- are responsible for **changing the appearance or behavior** of an **element/component/directive** (e.g **[ngClass]**, **[ngStyle]**, **ngModel**)
+- **`Component Directives`**, **`Structural Directives`** **`Attribute Directives`**
 
 ### 1\. Component Directives
 
 - A **Component** is a directive with a **template**, uses **@Component** decorator.
 
-- This is the most common type of directive you'll use.
+- This is the `most common type of directive` you'll use.
 - All Angular UI elements are built as components.
 
 <details>
@@ -57,11 +49,11 @@ export class UserCardComponent {
 
 ### 2\. Structural Directives
 
-- **Structural Directives** are responsible for **shaping or reshaping the DOM's structure**
+- **Structural Directives** are responsible for **`shaping or reshaping the DOM's structure`**
 
-- Typically by **adding**, **removing**, or **manipulating** elements.
+- Typically by **`adding`**, **`removing`**, or **`manipulating`** elements.
 
-- Built-in Structural Directives (**\*ngIf**, **\*ngFor**, **\*ngSwitch** or **@if**, **@for**, **@switch**)
+- Built-in Structural Directives (**`*ngIf`**, **`*ngFor`**, **`*ngSwitch`** or **`@if`**, **`@for`**, **`@switch`**)
 
 <details>
 <summary>Creating Custom Structural Directives</summary>
@@ -113,9 +105,9 @@ export class UnlessDirective {
 
 ### 3\. Attribute Directives
 
-- **Attribute Directives** are responsible for **changing the appearance or behavior of an element, component, or another directive** by modifying its properties.
+- **Attribute Directives** are responsible for **`changing the appearance or behavior of an element, component, or another directive`** by modifying its properties.
 
-- They **do not add or remove elements** from the **DOM**.
+- They **`do not add or remove elements`** from the **`DOM`**.
 - Built-in Attribute Directives (**`[ngClass]`**, **`[ngStyle]`**, **`ngModel`**)
 
 <details>
