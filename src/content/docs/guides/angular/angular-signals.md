@@ -1,6 +1,6 @@
 ---
 title: Angular Signals
-slug: guides/angular/signals
+slug: guides/angular/angular-signals
 description: Angular Signals
 sidebar:
   order: 5
@@ -14,7 +14,7 @@ sidebar:
 
 - Unlike traditional variables, signals maintain a list of dependencies and proactively update them, making state management more predictable and efficient.
 
-### Key Characteristics for Interview:
+### Key Characteristics of Signals:
 
 - **Reactive Values:** Signals hold values and automatically notify dependents when values change
 - **Granular Updates:** Track dependencies at the finest level, unlike Zone.js which triggers full change detection
@@ -63,7 +63,7 @@ const items = signal<string[]>([]); // Signal<string[]>
 **Detailed Description - Writable Signals:**
 Writable signals are the most basic type of signal that allow both reading and writing values. They act as the source of truth in your reactive state. When you create a writable signal, you're essentially creating a reactive container that holds a value and automatically notifies all dependents (computed signals, effects, or templates) whenever that value changes.
 
-**Key Interview Points:**
+**Key Points:**
 
 - Created using the `signal()` function with an initial value
 - Provide both read (`signal()`) and write (`set()`, `update()`, `mutate()`) operations
@@ -93,7 +93,7 @@ const fullName = computed(() => `${user().firstName} ${user().lastName}`);
 **Detailed Description - Computed Signals:**
 Computed signals are **readonly derived values** that automatically update when their dependencies change. They represent pure functions of other signals - when source signals change, computed signals automatically recalculate. Computed signals are lazy and only recalculate when their value is actually read, and only if their dependencies have changed since the last calculation.
 
-**Key Interview Points:**
+**Key Points:**
 
 - Created using `computed()` with a derivation function
 - Automatically track which signals they depend on
@@ -127,7 +127,7 @@ effect(() => {
 **Detailed Description - Effects:**
 Effects are the mechanism for **performing side effects** in response to signal changes. They automatically track which signals are read within them and re-execute whenever any of those signals change. Effects are Angular's way of bridging reactive state with imperative code like DOM manipulation, API calls, or logging.
 
-**Key Interview Points:**
+**Key Points:**
 
 - Created using `effect()` with a side-effect function
 - Automatically track all signals read during execution
@@ -328,9 +328,17 @@ export class ModernComponent {
 ```
 
 **Detailed Description - Signals vs RxJS:**
-While both Signals and RxJS handle reactivity, they solve different problems. RxJS is excellent for handling **event streams and asynchronous operations** - things that happen over time like HTTP requests, user events, or WebSocket messages. Signals are perfect for **synchronous state management** - the current value of something right now.
 
-The key difference is in the mental model: RxJS thinks in streams and time, while Signals think in values and reactivity. In modern Angular, you'll often use both together - Signals for component state and RxJS for async operations.
+- While both Signals and RxJS handle reactivity, they solve different problems.
+
+- RxJS is excellent for handling **event streams and asynchronous operations** - things that happen over time like HTTP requests, user events, or WebSocket messages.
+  -Signals are perfect for **synchronous state management** - the current value of something right now.
+
+**The key difference is in the mental model:**
+
+- RxJS thinks in streams and time.
+- Signals think in values and reactivity.
+- In modern Angular, you'll often use both together - Signals for component state and RxJS for async operations.
 
 ## 6. Advanced Signal Patterns
 
@@ -369,7 +377,7 @@ export class UserStore {
 **Detailed Description - Advanced Patterns:**
 As applications grow, you can build sophisticated state management patterns using signals. The store pattern shown above demonstrates how to encapsulate state and provide controlled access through methods. The `asReadonly()` method is particularly important for exposing signals without allowing external modification, maintaining encapsulation.
 
-## 7. Interview Questions & Answers
+## 7. Questions & Answers
 
 ### Q1: What problem do Signals solve in Angular?
 
