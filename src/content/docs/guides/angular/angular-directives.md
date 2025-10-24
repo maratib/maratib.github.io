@@ -8,15 +8,16 @@ sidebar:
 
 ### Directives
 
-- **Directives** are **`fundamental building blocks`** that allow you to **`manipulate the DOM`**.
+- **Fundamental building blocks** that allow you to **`manipulate the DOM`**.
 
 - **Directives** add **`new behavior`** to existing elements or **`modify`** their **`structure`**.
 
 - Every directive is marked with the **`@Directive()`** decorator.
 
 - There are **`three`** main **`types`** of **`directives`** in Angular:
-
-- **`Component Directives`**, **`Structural Directives`** **`Attribute Directives`**
+  1. **`Component Directives`**
+  2. **`Structural Directives`**
+  3. **`Attribute Directives`**
 
 ### 1\. Component Directives
 

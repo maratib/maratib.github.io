@@ -84,6 +84,37 @@ export default defineConfig({
           ],
         },
         {
+          label: "Blockchain",
+          collapsed: true,
+          items: [
+            {
+              label: "Hardhat Setup",
+              link: "guides/blockchain/hardhat-setup",
+            },
+            {
+              label: "DeFi",
+              collapsed: true,
+              autogenerate: { directory: "guides/blockchain/defi" },
+            },
+          ],
+        },
+        {
+          label: "NodeJS",
+          collapsed: true,
+          items: [
+            {
+              label: "Express",
+              collapsed: true,
+              autogenerate: { directory: "guides/node/express" },
+            },
+            {
+              label: "MongoDB",
+              collapsed: true,
+              autogenerate: { directory: "guides/node/mongodb" },
+            },
+          ],
+        },
+        {
           label: "Python",
           collapsed: true,
           items: [
@@ -153,57 +184,58 @@ export default defineConfig({
                 directory: "guides/java/hibernate",
               },
             },
+            {
+              label: "Spring Boot",
+              collapsed: true,
+              items: [
+                {
+                  label: "Spring Boot Startup",
+                  link: "guides/java/springboot/springboot-startup",
+                },
+                {
+                  label: "Bean Scopes",
+                  link: "guides/java/springboot/bean-scope",
+                },
+                {
+                  label: "Request Lifecycle",
+                  link: "guides/java/springboot/request-life-cycle",
+                },
+                {
+                  label: "Layered Architecture",
+                  link: "guides/java/springboot/layered-architecture",
+                },
+                {
+                  label: "Project Lombok",
+                  link: "guides/java/springboot/project-lombok",
+                },
+                {
+                  label: "JPA",
+                  collapsed: true,
+                  autogenerate: {
+                    directory: "guides/java/springboot/jpa",
+                  },
+                },
+                {
+                  label: "Reactor",
+                  collapsed: true,
+                  autogenerate: {
+                    directory: "guides/java/springboot/reactor",
+                  },
+                },
+              ],
+            },
+            {
+              label: "J2EE",
+              collapsed: true,
+              autogenerate: { directory: "guides/java/j2ee" },
+            },
           ],
         },
-        {
-          label: "J2EE",
-          collapsed: true,
-          autogenerate: { directory: "guides/j2ee" },
-        },
+
         {
           label: "APIs",
           collapsed: true,
           autogenerate: { directory: "guides/api" },
-        },
-        {
-          label: "Spring Boot",
-          collapsed: true,
-          items: [
-            {
-              label: "Spring Boot Startup",
-              link: "guides/springboot/springboot-startup",
-            },
-            {
-              label: "Bean Scopes",
-              link: "guides/springboot/bean-scope",
-            },
-            {
-              label: "Request Lifecycle",
-              link: "guides/springboot/request-life-cycle",
-            },
-            {
-              label: "Layered Architecture",
-              link: "guides/springboot/layered-architecture",
-            },
-            {
-              label: "Project Lombok",
-              link: "guides/springboot/project-lombok",
-            },
-            {
-              label: "JPA",
-              collapsed: true,
-              autogenerate: {
-                directory: "guides/springboot/jpa",
-              },
-            },
-            {
-              label: "Reactor",
-              collapsed: true,
-              autogenerate: {
-                directory: "guides/springboot/reactor",
-              },
-            },
-          ],
         },
         {
           label: "Flutter",
@@ -294,11 +326,6 @@ export default defineConfig({
               },
             },
           ],
-        },
-        {
-          label: "Express",
-          collapsed: true,
-          autogenerate: { directory: "guides/express" },
         },
         {
           label: "Starlight",
