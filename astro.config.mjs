@@ -112,6 +112,11 @@ export default defineConfig({
               collapsed: true,
               autogenerate: { directory: "guides/node/mongodb" },
             },
+            {
+              label: "NestJS",
+              collapsed: true,
+              autogenerate: { directory: "guides/node/nestjs" },
+            },
           ],
         },
         {
@@ -164,6 +169,11 @@ export default defineConfig({
           label: "Kotlin",
           collapsed: true,
           autogenerate: { directory: "guides/kotlin" },
+        },
+        {
+          label: "Macos",
+          collapsed: true,
+          autogenerate: { directory: "guides/macos" },
         },
         {
           label: "Java",
