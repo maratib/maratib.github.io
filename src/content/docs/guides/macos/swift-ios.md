@@ -6,13 +6,13 @@ sidebar:
   order: 6
 ---
 
-1. [SwiftUI Fundamentals](#fundamentals) - _Core concepts and syntax_
-2. [Project Structure](#project-structure) - _Folder organization for small apps_
-3. [Scalable Architecture](#scalable-architecture) - _Folder structure for large apps_
-4. [State Management](#state-management) - _Data flow and state handling_
-5. [Navigation](#navigation) - _Moving between screens_
-6. [Animations](#animations) - _Adding motion and transitions_
-7. [Best Practices](#best-practices) - _Production-ready patterns_
+1. **SwiftUI Fundamentals** - _Core concepts and syntax_
+2. **Project Structure** - _Folder organization for small apps_
+3. **Scalable Architecture** - _Folder structure for large apps_
+4. **State Management** - _Data flow and state handling_
+5. **Navigation** - _Moving between screens_
+6. **Animations** - _Adding motion and transitions_
+7. **Best Practices** - _Production-ready patterns_
 
 ---
 
