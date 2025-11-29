@@ -184,6 +184,10 @@ export default defineConfig({
               link: "guides/java/oop-design-patterns",
             },
             {
+              label: "JCF",
+              link: "guides/java/jcf",
+            },
+            {
               label: "Java 8 Features",
               link: "guides/java/java-8-features",
             },

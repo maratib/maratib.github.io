@@ -17,12 +17,14 @@ description: Java 8 new features
 ## Lambda Expressions
 
 ### Syntax
+
 ```java
 (parameters) -> expression
 (parameters) -> { statements; }
 ```
 
 ### Examples
+
 ```java
 // Traditional approach
 Runnable r1 = new Runnable() {
@@ -46,6 +48,7 @@ Function<String, Integer> func = (s) -> {
 ```
 
 ### Key Points
+
 - Enable functional programming in Java
 - Reduce boilerplate code
 - Type inference allows omitting parameter types
@@ -54,12 +57,14 @@ Function<String, Integer> func = (s) -> {
 ---
 
 ## Functional Interfaces
-An interface with exactly one abstract method, often called `SAM`. 
+
+An interface with exactly one abstract method, often called `SAM`.
 It can contain multiple default or static methods.
 
 ![Date Time](/img/java/java-8/funtional.svg)
 
 ### Key Characteristics
+
 1. **Single Abstract Method (SAM)**: Must have exactly one abstract method
 2. **Default Methods**: Can have any number of default methods with implementations
 3. **Static Methods**: Can have any number of static methods
@@ -68,13 +73,13 @@ It can contain multiple default or static methods.
 
 ### Built-in Functional Interfaces Table
 
-| Interface | Method Signature | Description | Common Use Cases |
-|-----------|------------------|-------------|------------------|
-| **Function<T,R>** | `R apply(T t)` | Takes one argument, produces a result | Transformations, mapping operations |
-| **Predicate<T>** | `boolean test(T t)` | Takes one argument, returns boolean | Filtering, conditional checks |
-| **Consumer<T>** | `void accept(T t)` | Takes one argument, returns void | Side-effects, consuming operations |
-| **Supplier<T>** | `T get()` | Takes no arguments, returns a value | Lazy initialization, factory methods |
-| **UnaryOperator<T>** | `T apply(T t)` | Takes one argument, returns same type | Operations where input = output type |
+| Interface             | Method Signature      | Description                            | Common Use Cases                              |
+| --------------------- | --------------------- | -------------------------------------- | --------------------------------------------- |
+| **Function<T,R>**     | `R apply(T t)`        | Takes one argument, produces a result  | Transformations, mapping operations           |
+| **Predicate<T>**      | `boolean test(T t)`   | Takes one argument, returns boolean    | Filtering, conditional checks                 |
+| **Consumer<T>**       | `void accept(T t)`    | Takes one argument, returns void       | Side-effects, consuming operations            |
+| **Supplier<T>**       | `T get()`             | Takes no arguments, returns a value    | Lazy initialization, factory methods          |
+| **UnaryOperator<T>**  | `T apply(T t)`        | Takes one argument, returns same type  | Operations where input = output type          |
 | **BinaryOperator<T>** | `T apply(T t1, T t2)` | Takes two arguments, returns same type | Reduction operations, mathematical operations |
 
 ### Examples
@@ -108,12 +113,12 @@ Supplier<List<String>> listSupplier = ArrayList::new;
 @FunctionalInterface
 interface StringProcessor {
     String process(String input);
-    
+
     // Default method
     default StringProcessor andThen(StringProcessor after) {
         return input -> after.process(this.process(input));
     }
-    
+
     // Static method
     static StringProcessor createDefault() {
         return input -> input.toUpperCase();
@@ -140,8 +145,6 @@ A: Yes, but only if the parent interface doesn't have any abstract methods, or i
 **Q: What are the most commonly used functional interfaces?**
 A: The most common are Function, Predicate, Consumer, and Supplier from java.util.function package.
 
-
-
 ## Method References
 
 ### Types of Method References
@@ -155,6 +158,7 @@ graph LR
 ```
 
 ### Syntax Examples
+
 ```java
 // Static method reference
 Function<String, Integer> parser = Integer::parseInt;
@@ -172,6 +176,7 @@ Function<Integer, String[]> arrayCreator = String[]::new;
 ```
 
 ### Equivalent Lambda Expressions
+
 ```java
 // Method reference
 Consumer<String> printer = System.out::println;
@@ -189,6 +194,7 @@ Consumer<String> printerLambda = s -> System.out.println(s);
 ![Date Time](/img/java/java-8/stream-pipe.svg)
 
 ### Stream Creation
+
 ```java
 // From Collection
 List<String> list = Arrays.asList("a", "b", "c");
@@ -204,30 +210,33 @@ Stream<Double> generateStream = Stream.generate(Math::random).limit(5);
 ```
 
 ### Intermediate Operations
-| Operation | Description | Example |
-|-----------|-------------|---------|
-| `filter()` | Filters elements | `.filter(s -> s.length() > 3)` |
-| `map()` | Transforms elements | `.map(String::toUpperCase)` |
-| `flatMap()` | Flattens streams | `.flatMap(list -> list.stream())` |
-| `distinct()` | Removes duplicates | `.distinct()` |
-| `sorted()` | Sorts elements | `.sorted()` |
-| `peek()` | Debugging operation | `.peek(System.out::println)` |
-| `limit()` | Limits size | `.limit(10)` |
-| `skip()` | Skips elements | `.skip(5)` |
+
+| Operation    | Description         | Example                           |
+| ------------ | ------------------- | --------------------------------- |
+| `filter()`   | Filters elements    | `.filter(s -> s.length() > 3)`    |
+| `map()`      | Transforms elements | `.map(String::toUpperCase)`       |
+| `flatMap()`  | Flattens streams    | `.flatMap(list -> list.stream())` |
+| `distinct()` | Removes duplicates  | `.distinct()`                     |
+| `sorted()`   | Sorts elements      | `.sorted()`                       |
+| `peek()`     | Debugging operation | `.peek(System.out::println)`      |
+| `limit()`    | Limits size         | `.limit(10)`                      |
+| `skip()`     | Skips elements      | `.skip(5)`                        |
 
 ### Terminal Operations
-| Operation | Description | Return Type |
-|-----------|-------------|-------------|
-| `forEach()` | Iterates elements | `void` |
-| `collect()` | Collects to collection | `Collection` |
-| `toArray()` | Converts to array | `Array` |
-| `reduce()` | Reduces to single value | `Optional` |
-| `min()/max()` | Finds min/max | `Optional` |
-| `count()` | Counts elements | `long` |
-| `anyMatch()/allMatch()/noneMatch()` | Condition checking | `boolean` |
-| `findFirst()/findAny()` | Finds elements | `Optional` |
+
+| Operation                           | Description             | Return Type  |
+| ----------------------------------- | ----------------------- | ------------ |
+| `forEach()`                         | Iterates elements       | `void`       |
+| `collect()`                         | Collects to collection  | `Collection` |
+| `toArray()`                         | Converts to array       | `Array`      |
+| `reduce()`                          | Reduces to single value | `Optional`   |
+| `min()/max()`                       | Finds min/max           | `Optional`   |
+| `count()`                           | Counts elements         | `long`       |
+| `anyMatch()/allMatch()/noneMatch()` | Condition checking      | `boolean`    |
+| `findFirst()/findAny()`             | Finds elements          | `Optional`   |
 
 ### Examples
+
 ```java
 // Filter and collect
 List<String> filtered = list.stream()
@@ -254,9 +263,11 @@ List<String> parallelResult = list.parallelStream()
 ## Optional Class
 
 ### Purpose
+
 Container object which may or may not contain a non-null value
 
 ### Creation Methods
+
 ```java
 Optional<String> empty = Optional.empty();
 Optional<String> of = Optional.of("value"); // throws NPE if null
@@ -264,6 +275,7 @@ Optional<String> ofNullable = Optional.ofNullable(maybeNull);
 ```
 
 ### Usage Patterns
+
 ```java
 // Traditional null check
 if (value != null) {
@@ -284,6 +296,7 @@ String result = optionalValue.orElseThrow(() -> new IllegalArgumentException());
 ```
 
 ### Method Chaining
+
 ```java
 Optional<String> result = Optional.ofNullable(user)
     .map(User::getAddress)
@@ -297,18 +310,19 @@ Optional<String> result = Optional.ofNullable(user)
 ## Default Methods
 
 ### Definition
+
 Methods in interfaces with implementation
 
 ```java
 interface Vehicle {
     // Traditional abstract method
     String getBrand();
-    
+
     // Default method
     default String turnAlarmOn() {
         return "Turning vehicle alarm on";
     }
-    
+
     // Static method
     static int getHorsePower(int rpm, int torque) {
         return (rpm * torque) / 5252;
@@ -317,6 +331,7 @@ interface Vehicle {
 ```
 
 ### Multiple Inheritance Resolution
+
 ```java
 interface A {
     default void hello() { System.out.println("A"); }
@@ -339,9 +354,11 @@ class C implements A, B {
 ## Date and Time API
 
 ### Key Classes
+
 ![Date Time](/img/java/java-8/data-time.svg)
 
 ### Examples
+
 ```java
 // Current date/time
 LocalDate today = LocalDate.now();
@@ -373,6 +390,7 @@ Period period = Period.between(startDate, endDate);
 ## Nashorn JavaScript Engine
 
 ### Usage
+
 ```java
 // Create JavaScript engine
 ScriptEngineManager manager = new ScriptEngineManager();
@@ -391,6 +409,7 @@ engine.eval("var list = new ArrayList();");
 ## Parallel Arrays
 
 ### Parallel Operations
+
 ```java
 int[] numbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
@@ -405,21 +424,27 @@ Arrays.parallelSetAll(numbers, i -> i * 2);
 ## Interview Questions & Answers
 
 ### Q: What are the main advantages of Lambda Expressions?
+
 **A:** Reduced boilerplate code, improved readability, enable functional programming, better API design, and parallel processing support.
 
 ### Q: Explain the difference between `map()` and `flatMap()`
+
 **A:** `map()` transforms each element to another element, while `flatMap()` transforms each element to a stream and then flattens all streams into one.
 
 ### Q: When would you use `Optional`?
+
 **A:** When a method might return null, to avoid NullPointerException, and to explicitly indicate that a value might be absent.
 
 ### Q: What is the purpose of default methods?
+
 **A:** To add new methods to interfaces without breaking existing implementations, enabling interface evolution.
 
 ### Q: How do streams support parallel processing?
+
 **A:** Through `parallelStream()` and intermediate operations that can be executed concurrently, leveraging multi-core processors.
 
 ### Q: Difference between `Predicate` and `Function`?
+
 **A:** `Predicate` takes input and returns boolean, `Function` takes input and returns output of any type.
 
 ---
@@ -431,4 +456,3 @@ Arrays.parallelSetAll(numbers, i -> i * 2);
 - Avoid stateful lambdas in parallel streams
 - Use primitive streams (IntStream, etc.) for better performance
 - Consider using `Arrays.parallelSort()` for large arrays
-
