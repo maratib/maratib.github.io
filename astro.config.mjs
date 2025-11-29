@@ -192,6 +192,10 @@ export default defineConfig({
               link: "guides/java/java-8-features",
             },
             {
+              label: "Method Reference",
+              link: "guides/java/method",
+            },
+            {
               label: "Hibernate",
               collapsed: true,
               autogenerate: {
@@ -217,6 +221,14 @@ export default defineConfig({
                 {
                   label: "Layered Architecture",
                   link: "guides/java/springboot/layered-architecture",
+                },
+                {
+                  label: "Exceptions",
+                  link: "guides/java/springboot/exceptions",
+                },
+                {
+                  label: "JWT",
+                  link: "guides/java/springboot/jwt",
                 },
                 {
                   label: "Lombok",
