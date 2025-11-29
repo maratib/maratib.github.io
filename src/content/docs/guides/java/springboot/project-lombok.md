@@ -3,843 +3,635 @@ title: Project Lombok
 description: Project Lombok
 ---
 
-Project Lombok is a Java library that automatically plugs into your editor and build tools, spicing up your Java code. It helps you eliminate boilerplate code like getters, setters, constructors, equals, hashCode, toString methods, and more through annotations.
+Lombok is a Java library that automatically plugs into your editor and build tools, spicing up your Java code by generating boilerplate code through annotations
 
-### IDE Setup
+## Introduction to Lombok
 
-**VSCode:**
+### What is Lombok?
 
-1. [Install Lombok extension](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-lombok)
+- **Java library** that reduces boilerplate code through annotations
+- **Automatically generates** getters, setters, constructors, equals, hashCode, toString
+- **Plugins available** for all major IDEs (IntelliJ, Eclipse, VS Code)
 
-## 1. Core Annotations
+### Why Use Lombok in Spring Boot 3?
 
-### @Getter and @Setter
+- **Reduces boilerplate** by 50-80% in typical Spring Boot applications
+- **Improves readability** by keeping classes clean and focused
+- **Maintains clean domain models** without cluttering business logic
+- **Reduces maintenance** overhead and human error
+
+## Setup & Configuration
+
+### 1. Maven Configuration - _Add Lombok dependency to your project_
+
+<details>
+  <summary>Add Lombok dependency to your project</summary>
+  
+```xml  
+<!-- pom.xml -->
+<dependencies>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <configuration>
+                <excludes>
+                    <exclude>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                    </exclude>
+                </excludes>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+</details>
+
+### 2. IDE Setup - _Configure your development environment_
+
+- **Install Lombok plugin** for your IDE
+- **Enable annotation processing** in compiler settings
+- **For IntelliJ**: Settings → Build → Compiler → Annotation Processors → Enable
+- **VSCode:** [Install Lombok extension](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-lombok)
+
+### 3. lombok.config - _Project-specific Lombok configuration_
+
+```properties
+# Root directory lombok.config
+config.stopbubbling = true
+lombok.anyConstructor.addConstructorProperties = true
+lombok.addLombokGeneratedAnnotation = true
+lombok.experimental.flagUsage = WARNING
+lombok.accessors.chain = true
+```
+
+## Core Annotations
+
+### 1. @Data - _All-in-one annotation for POJOs_
+
+- **Generates**: getters, setters, toString, equals, hashCode, required constructor
+- **Use case**: Simple data classes and entities
 
 ```java
-import lombok.Getter;
-import lombok.Setter;
-
+@Entity
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class User {
-    @Getter @Setter
-    private String username;
-
-    @Getter @Setter
+    @Id
+    private Long id;
     private String email;
-
-    @Setter(AccessLevel.PROTECTED)
-    private String password;
-
-    @Getter(AccessLevel.PUBLIC)
-    private final String userId = "generated-id";
-}
-
-// Without Lombok
-class UserWithoutLombok {
-    private String username;
-    private String email;
-    private String password;
-    private final String userId = "generated-id";
-
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    protected void setPassword(String password) { this.password = password; }
-    public String getUserId() { return userId; }
+    private String firstName;
+    private String lastName;
 }
 ```
 
-### @ToString
+### 2. @Getter/@Setter - _Fine-grained access control_
+
+- **Generates**: Only getters or setters as specified
+- **Use case**: When you need partial code generation
 
 ```java
-import lombok.ToString;
-
-@ToString
+@Entity
+@Getter
+@Setter
 public class Product {
+    @Id
+    private Long id;
     private String name;
-    private double price;
-    private String category;
+    private BigDecimal price;
+}
+```
 
-    @ToString.Exclude
-    private String secretCode;
+### 3. @Builder - _Implements Builder pattern_
 
-    @ToString.Include(name = "formattedPrice")
-    private String getFormattedPrice() {
-        return "$" + price;
+- **Generates**: Builder class for fluent object creation
+- **Use case**: Complex object construction with many parameters
+
+```java
+@Service
+@RequiredArgsConstructor
+public class ProductService {
+    public Product createProduct() {
+        return Product.builder()
+            .name("Laptop")
+            .price(999.99)
+            .build();
     }
+}
+```
+
+### 4. @AllArgsConstructor & @NoArgsConstructor - _Constructor generation_
+
+- **@AllArgsConstructor**: Creates constructor with all fields
+- **@NoArgsConstructor**: Creates no-argument constructor
+- **Use case**: JPA entities, DTOs, configuration classes
+
+```java
+@Entity
+@Data
+@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Category {
+    @Id
+    private Long id;
+    private String name;
+}
+```
+
+### 5. @RequiredArgsConstructor - _Constructor injection for Spring_
+
+- **Generates**: Constructor with final fields
+- **Use case**: Spring service classes with dependency injection
+
+```java
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+    private final OrderRepository orderRepository;
+    private final PaymentService paymentService;
+    // Constructor automatically generated
+}
+```
+
+### 6. @Value - _Immutable data classes_
+
+- **Generates**: All fields are private final, getters, equals, hashCode, toString
+- **Use case**: Immutable DTOs, configuration objects, value objects
+
+```java
+@Value
+@Builder
+public class UserDto {
+    Long id;
+    String email;
+    String fullName;
+}
+```
+
+## Advanced Features
+
+### 1. @With - _Immutable updates_
+
+- **Generates**: `withFieldName(value)` methods for immutable updates
+- **Use case**: Functional programming style, configuration updates
+
+```java
+@Value
+@Builder
+@With
+public class ImmutableConfig {
+    String apiKey;
+    int timeout;
 }
 
 // Usage
-Product product = new Product();
-product.setName("Laptop");
-product.setPrice(999.99);
-product.setCategory("Electronics");
-System.out.println(product);
-// Output: Product(name=Laptop, price=999.99, category=Electronics, formattedPrice=$999.99)
+ImmutableConfig config = new ImmutableConfig("key", 30);
+ImmutableConfig updated = config.withTimeout(60);
 ```
 
-### @EqualsAndHashCode
+### 2. @Singular - _Collection builders_
+
+- **Generates**: Builder methods for adding single elements to collections
+- **Use case**: Building objects with collections in a fluent way
 
 ```java
-import lombok.EqualsAndHashCode;
-
-@EqualsAndHashCode
-public class Employee {
-    private String employeeId;
-    private String name;
-
-    @EqualsAndHashCode.Exclude
-    private String temporaryCode;
-}
-
-// Equivalent to:
-class EmployeeWithoutLombok {
-    private String employeeId;
-    private String name;
-    private String temporaryCode;
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        EmployeeWithoutLombok that = (EmployeeWithoutLombok) o;
-        return Objects.equals(employeeId, that.employeeId) &&
-               Objects.equals(name, that.name);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(employeeId, name);
-    }
-}
-```
-
-### @NoArgsConstructor, @RequiredArgsConstructor, @AllArgsConstructor
-
-```java
-import lombok.*;
-
-@NoArgsConstructor
-@AllArgsConstructor
-@RequiredArgsConstructor
-public class Person {
-    @NonNull
-    private String name;
-
-    private int age;
-
-    private final String country = "USA";
-}
-
-// Usage examples:
-Person p1 = new Person();              // NoArgsConstructor
-Person p2 = new Person("John", 25);    // AllArgsConstructor
-Person p3 = new Person("Jane");        // RequiredArgsConstructor (only @NonNull fields)
-```
-
-### @Data
-
-**The @Data annotation is a convenient shortcut that bundles:**
-
-- @Getter
-- @Setter
-- @ToString
-- @EqualsAndHashCode
-- @RequiredArgsConstructor
-
-```java
-import lombok.Data;
-
-@Data
-public class Student {
-    private final String studentId;
-    private String name;
-    private int age;
-    private String email;
-}
-
-// Equivalent to:
-class StudentWithoutLombok {
-    private final String studentId;
-    private String name;
-    private int age;
-    private String email;
-
-    public StudentWithoutLombok(String studentId) {
-        this.studentId = studentId;
-    }
-
-    // Getters and setters for all non-final fields
-    // equals(), hashCode(), toString() methods
-}
-```
-
-### @Builder
-
-```java
-import lombok.Builder;
-import lombok.Singular;
-import java.util.List;
-
-@Builder
-public class Order {
-    private String orderId;
-    private String customerName;
-    private double totalAmount;
-
-    @Singular
-    private List<String> items;
-
-    @Builder.Default
-    private String status = "PENDING";
-}
-
-// Usage:
-Order order = Order.builder()
-    .orderId("ORD123")
-    .customerName("John Doe")
-    .totalAmount(199.99)
-    .item("Laptop")
-    .item("Mouse")
-    .item("Keyboard")
-    .build();
-
-// Custom builder method
-@Builder(builderMethodName = "internalBuilder", buildMethodName = "create")
-class CustomBuilderExample {
-    private String value;
-
-    public static class CustomBuilderExampleBuilder {
-        public CustomBuilderExample create() {
-            // Custom validation
-            if (value == null) {
-                throw new IllegalStateException("Value cannot be null");
-            }
-            return new CustomBuilderExample(this);
-        }
-    }
-}
-```
-
-### @Value
-
-**@Value creates immutable classes (similar to @Data but for immutable objects)**
-
-```java
-import lombok.Value;
-import lombok.With;
-
-@Value
-@Builder
-public class ImmutableUser {
-    String username;
-    String email;
-    @With
-    int age;
-}
-
-// Usage:
-ImmutableUser user = ImmutableUser.builder()
-    .username("john")
-    .email("john@example.com")
-    .age(25)
-    .build();
-
-// Create a new instance with modified age
-ImmutableUser olderUser = user.withAge(26);
-```
-
-## 2. Advanced Features
-
-### @Slf4j, @Log, etc.
-
-```java
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
-public class LoggingExample {
-    public void processData() {
-        log.info("Processing started");
-        try {
-            // business logic
-            log.debug("Debug information");
-        } catch (Exception e) {
-            log.error("Error occurred", e);
-        }
-    }
-}
-
-// Equivalent to:
-class LoggingExampleWithoutLombok {
-    private static final org.slf4j.Logger log =
-        org.slf4j.LoggerFactory.getLogger(LoggingExampleWithoutLombok.class);
-
-    public void processData() {
-        log.info("Processing started");
-        // ... same code
-    }
-}
-```
-
-### @SneakyThrows
-
-```java
-import lombok.SneakyThrows;
-import java.io.*;
-
-public class FileProcessor {
-
-    @SneakyThrows(IOException.class)
-    public String readFile(String path) {
-        try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
-            return reader.readLine();
-        }
-    }
-
-    @SneakyThrows // Throws any exception that occurs
-    public void riskyMethod() {
-        throw new Exception("This exception is sneaky!");
-    }
-}
-
-// Equivalent to:
-class FileProcessorWithoutLombok {
-    public String readFile(String path) {
-        try {
-            try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
-                return reader.readLine();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-}
-```
-
-### @Synchronized
-
-```java
-import lombok.Synchronized;
-
-public class SynchronizedExample {
-    private final Object readLock = new Object();
-
-    @Synchronized
-    public void method1() {
-        // synchronized on 'this'
-    }
-
-    @Synchronized("readLock")
-    public void method2() {
-        // synchronized on readLock object
-    }
-}
-
-// Equivalent to:
-class SynchronizedExampleWithoutLombok {
-    private final Object readLock = new Object();
-
-    public void method1() {
-        synchronized (this) {
-            // method body
-        }
-    }
-
-    public void method2() {
-        synchronized (readLock) {
-            // method body
-        }
-    }
-}
-```
-
-### @Cleanup
-
-```java
-import lombok.Cleanup;
-import java.io.*;
-
-public class CleanupExample {
-    public void copyFile(String source, String destination) throws IOException {
-        @Cleanup InputStream in = new FileInputStream(source);
-        @Cleanup OutputStream out = new FileOutputStream(destination);
-
-        byte[] buffer = new byte[1024];
-        int length;
-        while ((length = in.read(buffer)) != -1) {
-            out.write(buffer, 0, length);
-        }
-    }
-}
-
-// Equivalent to:
-class CleanupExampleWithoutLombok {
-    public void copyFile(String source, String destination) throws IOException {
-        InputStream in = new FileInputStream(source);
-        try {
-            OutputStream out = new FileOutputStream(destination);
-            try {
-                byte[] buffer = new byte[1024];
-                int length;
-                while ((length = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, length);
-                }
-            } finally {
-                if (out != null) {
-                    out.close();
-                }
-            }
-        } finally {
-            if (in != null) {
-                in.close();
-            }
-        }
-    }
-}
-```
-
-## 3. Configuration and Customization
-
-### lombok.config
-
-Create a `lombok.config` file in your project root:
-
-```properties
-# Global configuration
-lombok.anyConstructor.suppressConstructorProperties = true
-lombok.addLombokGeneratedAnnotation = true
-
-# Make @Data entities more JPA-friendly
-lombok.data.ignoreNull = true
-
-# Logging configuration
-lombok.log.fieldName = LOGGER
-lombok.log.fieldIsStatic = false
-
-# Warning configuration
-lombok.experimental.flagUsage = WARNING
-```
-
-### Field Name Constants
-
-```java
-import lombok.experimental.FieldNameConstants;
-
-@FieldNameConstants
-public class ConstantsExample {
-    private String firstName;
-    private String lastName;
-    private int age;
-}
-
-// Usage:
-String fieldName = ConstantsExample.Fields.firstName; // "firstName"
-```
-
-## 4. Practical Examples
-
-### JPA Entity with Lombok
-
-```java
-import lombok.*;
-import javax.persistence.*;
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "users")
 @Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class User {
-
-    @Id
-    @EqualsAndHashCode.Include
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+public class ShoppingCart {
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String username;
+    @Singular
+    private List<CartItem> items;
 
-    @Column(nullable = false)
-    private String email;
+    @Singular("tag")
+    private Set<String> tags;
+}
+```
 
-    @Column(nullable = false)
-    private String password;
+### 3. @Slf4j, @CommonsLog, @Log4j2 - _Logger injection_
 
-    @Builder.Default
-    private boolean active = true;
+- **Generates**: Logger field automatically
+- **Use case**: Any class that needs logging
 
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
-
-    // Custom getter
-    public String getDisplayName() {
-        return username + " (" + email + ")";
+```java
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class PaymentService {
+    public void processPayment() {
+        log.info("Processing payment");
+        // Business logic
     }
 }
 ```
 
-### DTO with Lombok
+### 4. Customizing @ToString - _Control toString output_
+
+- **Controls**: Which fields to include in toString
+- **Use case**: Excluding sensitive data, circular references
 
 ```java
-import lombok.Value;
+@Entity
+@Data
+@ToString(onlyExplicitlyIncluded = true)
+public class Employee {
+    @Id
+    @ToString.Include
+    private Long id;
 
+    private String ssn; // Sensitive - excluded automatically
+}
+```
+
+### 5. @EqualsAndHashCode - _Control equality comparison_
+
+- **Controls**: Which fields to use in equals and hashCode
+- **Use case**: Business key equality, excluding certain fields
+
+```java
+@Entity
+@Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Product {
+    @Id
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @EqualsAndHashCode.Include
+    private String sku; // Business key
+}
+```
+
+## Spring Boot Integration
+
+### 1. Configuration Properties - _Type-safe configuration_
+
+- **Combines**: Lombok with Spring's @ConfigurationProperties
+- **Use case**: Application configuration classes
+
+```java
+@ConfigurationProperties(prefix = "app.security")
+@Data
+@Validated
+public class SecurityConfigProperties {
+    @NotBlank
+    private String secretKey;
+
+    @Min(1)
+    private int tokenExpirationMinutes = 30;
+}
+```
+
+### 2. JPA Entities with Lombok - _Clean entity definitions_
+
+- **Combines**: Lombok with JPA annotations
+- **Use case**: Database entities with minimal boilerplate
+
+```java
+@Entity
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Order {
+    @Id
+    private Long id;
+
+    @OneToMany(mappedBy = "order")
+    @ToString.Exclude
+    private List<OrderItem> items;
+}
+```
+
+### 3. DTO Pattern with Lombok - _Data transfer objects_
+
+- **Separates**: API layer from persistence layer
+- **Use case**: Request/response objects in REST APIs
+
+```java
+// Request DTO
+@Data
+@Builder
+public class CreateUserRequest {
+    @NotBlank
+    private String email;
+    private String firstName;
+    private String lastName;
+}
+
+// Response DTO
 @Value
 @Builder
-public class UserDTO {
-    String username;
+public class UserResponse {
+    Long id;
     String email;
-    boolean active;
-    String displayName;
-
-    public static UserDTO fromEntity(User user) {
-        return UserDTO.builder()
-            .username(user.getUsername())
-            .email(user.getEmail())
-            .active(user.isActive())
-            .displayName(user.getDisplayName())
-            .build();
-    }
+    String fullName;
 }
 ```
 
-### Service Class with Lombok
+### 4. Service Layer with Constructor Injection - _Dependency injection_
+
+- **Uses**: @RequiredArgsConstructor for automatic constructor injection
+- **Use case**: Spring service classes
 
 ```java
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
 @Service
-@Slf4j
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
-
     private final UserRepository userRepository;
     private final EmailService emailService;
 
-    public User createUser(CreateUserRequest request) {
-        log.info("Creating user: {}", request.getUsername());
-
-        User user = User.builder()
-            .username(request.getUsername())
-            .email(request.getEmail())
-            .password(request.getPassword())
-            .build();
-
-        User savedUser = userRepository.save(user);
-        emailService.sendWelcomeEmail(savedUser.getEmail());
-
-        return savedUser;
+    // No explicit constructor needed
+    public User createUser(User user) {
+        return userRepository.save(user);
     }
 }
 ```
 
-## 5. Common Patterns and Best Practices
+### 5. Controller Layer - _REST endpoint definitions_
 
-### Immutable Configuration Classes
+- **Combines**: Lombok with Spring MVC annotations
+- **Use case**: REST controller classes
 
 ```java
-@Value
-@Builder
-@ConfigurationProperties(prefix = "app.database")
-public class DatabaseConfig {
-    String url;
-    String username;
-    String password;
-    int poolSize;
+@RestController
+@RequestMapping("/api/users")
+@RequiredArgsConstructor
+public class UserController {
+    private final UserService userService;
 
-    @Builder.Default
-    boolean sslEnabled = false;
-
-    @Builder.Default
-    int timeout = 30;
+    @PostMapping
+    public UserResponse createUser(@RequestBody CreateUserRequest request) {
+        return userService.createUser(request);
+    }
 }
 ```
 
-### Builder with Validation
+## Best Practices
+
+### 1. Entity Best Practices - _JPA and Lombok compatibility_
+
+- **Always include**: @NoArgsConstructor for JPA compliance
+- **Exclude**: Bidirectional relationships from toString and equals
+- **Use**: @Builder for complex entity creation
+
+```java
+@Entity
+@Data
+@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Product {
+    @Id
+    @EqualsAndHashCode.Include
+    private Long id;
+
+    @OneToMany(mappedBy = "product")
+    @ToString.Exclude
+    private List<OrderItem> orderItems;
+}
+```
+
+### 2. Builder Pattern Best Practices - _Effective object building_
+
+- **Use**: @Builder(toBuilder = true) for immutable updates
+- **Add**: Custom builder methods for common scenarios
+- **Validate**: In custom build() methods
+
+```java
+@Value
+@Builder(toBuilder = true)
+public class ApiResponse<T> {
+    boolean success;
+    String message;
+    T data;
+
+    // Predefined success response
+    public static <T> ApiResponse<T> success(T data) {
+        return ApiResponse.<T>builder()
+            .success(true)
+            .message("Success")
+            .data(data)
+            .build();
+    }
+}
+```
+
+### 3. Configuration Best Practices - _Application configuration_
+
+- **Combine**: @ConfigurationProperties with @Data
+- **Use**: Nested classes for complex configurations
+- **Validate**: Configuration with Bean Validation
+
+```java
+@ConfigurationProperties(prefix = "app.database")
+@Validated
+@Data
+public class DatabaseProperties {
+    @NotBlank
+    private String url;
+
+    @Valid
+    private Pool pool = new Pool();
+
+    @Data
+    public static class Pool {
+        @Min(1)
+        private int maxSize = 10;
+    }
+}
+```
+
+### 4. Testing with Lombok - _Clean test code_
+
+- **Use**: Builders for test data creation
+- **Leverage**: @Builder in test fixtures
+- **Keep**: Test classes clean and readable
 
 ```java
 @Data
 @Builder
-public class ValidatedUser {
-    @NotBlank
+class TestUser {
+    private Long id;
     private String username;
+}
 
-    @Email
-    private String email;
+class UserServiceTest {
+    @Test
+    void shouldCreateUser() {
+        TestUser testUser = TestUser.builder()
+            .id(1L)
+            .username("testuser")
+            .build();
 
-    @Min(18)
-    private int age;
+        // Test logic
+    }
+}
+```
 
-    public static class ValidatedUserBuilder {
-        public ValidatedUser build() {
-            ValidatedUser user = new ValidatedUser(this);
+## Common Pitfalls
+
+### 1. JPA and Lombok Compatibility - _Avoid JPA issues_
+
+- **Problem**: Missing proper constructors for JPA
+- **Solution**: Always include @NoArgsConstructor(access = AccessLevel.PROTECTED)
+
+```java
+// ✅ Correct
+@Entity
+@Data
+@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+public class CorrectEntity {
+    @Id
+    private Long id;
+}
+```
+
+### 2. Circular Dependency in toString() - _Avoid StackOverflowError_
+
+- **Problem**: Bidirectional relationships cause infinite recursion
+- **Solution**: Use @ToString.Exclude on relationship fields
+
+```java
+@Entity
+@Data
+@ToString(onlyExplicitlyIncluded = true)
+public class Order {
+    @Id
+    @ToString.Include
+    private Long id;
+
+    @OneToMany(mappedBy = "order")
+    @ToString.Exclude
+    private List<OrderItem> items;
+}
+```
+
+### 3. Immutable Objects with @With - _Safe object updates_
+
+- **Use case**: Functional updates without modifying original object
+- **Benefit**: Thread-safe and predictable behavior
+
+```java
+@Value
+@Builder
+@With
+public class Configuration {
+    String host;
+    int port;
+
+    public Configuration withHttpsPort() {
+        return this.withPort(443);
+    }
+}
+```
+
+### 4. Handling Optional Fields in Builders - _Flexible object creation_
+
+- **Use**: @Builder.Default for default values
+- **Add**: Custom validation in builder
+
+```java
+@Data
+@Builder
+public class ProductFilter {
+    @Builder.Default
+    private Optional<String> category = Optional.empty();
+
+    public static class ProductFilterBuilder {
+        public ProductFilter build() {
             // Custom validation
-            if (user.getUsername().length() < 3) {
-                throw new IllegalArgumentException("Username must be at least 3 characters");
-            }
-            return user;
+            return new ProductFilter(category);
         }
     }
 }
 ```
 
-### Record-like Classes (Pre-Java 16)
+## Performance Considerations
+
+### 1. Lazy Getter - _Optimize expensive computations_
+
+- **Use case**: Fields that require heavy computation
+- **Benefit**: Computation happens only once when first accessed
 
 ```java
-@Value
-@Builder
-@AllArgsConstructor
-public class Point {
-    int x;
-    int y;
-
-    public Point withX(int newX) {
-        return new Point(newX, this.y);
-    }
-
-    public Point withY(int newY) {
-        return new Point(this.x, newY);
-    }
+@Data
+public class ExpensiveResource {
+    @Getter(lazy = true)
+    private final String expensiveData = computeExpensively();
 }
 ```
 
-## 6. Testing with Lombok
+### 2. @EqualsAndHashCode Cache - _Optimize frequent comparisons_
 
-### Test Classes
+- **Use case**: Objects with expensive equality computation
+- **Benefit**: Caches hashCode for better performance
 
 ```java
-import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-@Slf4j
-@ExtendWith(MockitoExtension.class)
-class UserServiceTest {
-
-    @Test
-    void shouldCreateUserSuccessfully() {
-        // Given
-        CreateUserRequest request = CreateUserRequest.builder()
-            .username("testuser")
-            .email("test@example.com")
-            .password("password")
-            .build();
-
-        log.info("Testing user creation with: {}", request);
-
-        // When & Then
-        // ... test implementation
-    }
+@EqualsAndHashCode(cacheStrategy = EqualsAndHashCode.CacheStrategy.LAZY)
+@Data
+public class LargeObject {
+    private String field1;
+    // ... many fields
 }
 ```
 
-## 7. Common Pitfalls and Solutions
+## Migration Strategy
 
-### Circular References in @ToString
+### From Traditional Java to Lombok - _Gradual adoption_
 
-```java
-// Problematic:
-@Data
-class Department {
-    private String name;
-    private List<Employee> employees;
-}
-
-@Data
-class Employee {
-    private String name;
-    private Department department; // Circular reference!
-}
-
-// Solution:
-@Data
-class Department {
-    private String name;
-
-    @ToString.Exclude
-    private List<Employee> employees;
-}
-
-@Data
-class Employee {
-    private String name;
-
-    @ToString.Exclude
-    private Department department;
-}
-```
-
-### Inheritance Issues
+- **Start with**: New classes using Lombok
+- **Refactor**: Existing classes gradually
+- **Benefits**: Immediate boilerplate reduction
 
 ```java
-// Base class
-@Data
-class BaseEntity {
+// Before: 50+ lines of boilerplate
+public class TraditionalUser {
     private Long id;
-    private LocalDateTime createdAt;
+    private String name;
+    // ... getters, setters, constructors, equals, hashCode, toString
 }
 
-// Child class - PROBLEMATIC
-@Data
-class User extends BaseEntity {
-    private String username;
-    // Missing BaseEntity fields in equals/hashCode/toString!
-}
-
-// Solution:
-@Data
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
-class User extends BaseEntity {
-    private String username;
-}
-```
-
-## 8. Lombok with Spring Boot
-
-### Complete Spring Boot Example
-
-```java
-// Entity
-@Entity
+// After: 5 lines with same functionality
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Product {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+public class ModernUser {
     private Long id;
-
     private String name;
-    private String description;
-    private BigDecimal price;
-
-    @Builder.Default
-    private Boolean active = true;
-}
-
-// Repository
-public interface ProductRepository extends JpaRepository<Product, Long> {
-}
-
-// Service
-@Service
-@RequiredArgsConstructor
-@Slf4j
-public class ProductService {
-    private final ProductRepository productRepository;
-
-    public Product createProduct(ProductDTO productDTO) {
-        log.info("Creating product: {}", productDTO.getName());
-
-        Product product = Product.builder()
-            .name(productDTO.getName())
-            .description(productDTO.getDescription())
-            .price(productDTO.getPrice())
-            .build();
-
-        return productRepository.save(product);
-    }
-
-    public ProductDTO toDTO(Product product) {
-        return ProductDTO.builder()
-            .id(product.getId())
-            .name(product.getName())
-            .description(product.getDescription())
-            .price(product.getPrice())
-            .active(product.getActive())
-            .build();
-    }
-}
-
-// DTO
-@Data
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
-public class ProductDTO {
-    private Long id;
-
-    @NotBlank
-    private String name;
-
-    private String description;
-
-    @Positive
-    private BigDecimal price;
-
-    private Boolean active;
-}
-
-// Controller
-@RestController
-@RequestMapping("/api/products")
-@RequiredArgsConstructor
-@Slf4j
-public class ProductController {
-    private final ProductService productService;
-
-    @PostMapping
-    public ResponseEntity<ProductDTO> createProduct(@Valid @RequestBody ProductDTO productDTO) {
-        Product product = productService.createProduct(productDTO);
-        return ResponseEntity.ok(productService.toDTO(product));
-    }
 }
 ```
 
-## 9. Migration Tips
+## Conclusion
 
-### Before Lombok
+### Key Takeaways:
 
-```java
-public class User {
-    private String name;
-    private String email;
-    private int age;
+- **Lombok dramatically reduces** boilerplate code in Spring Boot applications
+- **Proper configuration** ensures compatibility with Spring Boot and JPA
+- **Best practices** prevent common issues and improve code quality
+- **Advanced features** provide powerful tools for complex scenarios
+- **Gradual migration** allows smooth adoption in existing projects
 
-    public User() {}
+### Recommended Approach:
 
-    public User(String name, String email, int age) {
-        this.name = name;
-        this.email = email;
-        this.age = age;
-    }
-
-    // 20+ lines of boilerplate...
-}
-```
-
-### After Lombok
-
-```java
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class User {
-    private String name;
-    private String email;
-    private int age;
-}
-```
-
-## Benefits of Using Lombok
-
-1. **Reduced Boilerplate**: 50-80% less code
-2. **Improved Readability**: Focus on business logic
-3. **Fewer Bugs**: Auto-generated methods are reliable
-4. **Easy Refactoring**: Change fields, methods auto-update
-5. **Better Maintenance**: Consistent code generation
-
-## When NOT to Use Lombok
-
-1. **Library Development**: Forces dependency on users
-2. **Complex Business Logic**: Manual implementation might be better
-3. **Team Resistance**: If team prefers explicit code
-4. **Annotation Overload**: Too many annotations can reduce readability
+1. **Start with** @Data and @Builder for new entities
+2. **Use** @RequiredArgsConstructor for Spring services
+3. **Apply** @Value for immutable DTOs
+4. **Configure** lombok.config for project consistency
+5. **Follow** best practices to avoid common pitfalls

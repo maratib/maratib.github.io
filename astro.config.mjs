@@ -215,8 +215,20 @@ export default defineConfig({
                   link: "guides/java/springboot/layered-architecture",
                 },
                 {
-                  label: "Project Lombok",
+                  label: "Lombok",
                   link: "guides/java/springboot/project-lombok",
+                },
+                {
+                  label: "Testing",
+                  link: "guides/java/springboot/testing",
+                },
+                {
+                  label: "RestAssured",
+                  link: "guides/java/springboot/rest-assured",
+                },
+                {
+                  label: "YAML",
+                  link: "guides/java/springboot/yaml",
                 },
                 {
                   label: "JPA",
