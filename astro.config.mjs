@@ -16,6 +16,15 @@ export default defineConfig({
       title: "maratib",
       favicon: "favicon.ico",
       customCss: ["./src/assets/css/styles.scss"],
+      head: [
+        {
+          tag: "script",
+          attrs: {
+            src: "/scripts/mermaid-fullscreen.js",
+            defer: true,
+          },
+        },
+      ],
       logo: {
         src: "./src/assets/img/houston.webp",
         alt: "Maratib Ali Khan",
@@ -239,6 +248,14 @@ export default defineConfig({
                   link: "guides/java/springboot/testing",
                 },
                 {
+                  label: "Swagger",
+                  link: "guides/java/springboot/swagger",
+                },
+                {
+                  label: "Actuator",
+                  link: "guides/java/springboot/actuator",
+                },
+                {
                   label: "RestAssured",
                   link: "guides/java/springboot/rest-assured",
                 },
@@ -259,6 +276,16 @@ export default defineConfig({
                   autogenerate: {
                     directory: "guides/java/springboot/reactor",
                   },
+                },
+              ],
+            },
+            {
+              label: "Spring Cloud",
+              collapsed: true,
+              items: [
+                {
+                  label: "Gateway",
+                  link: "guides/java/springcloud/gateway",
                 },
               ],
             },
