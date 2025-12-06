@@ -205,6 +205,13 @@ export default defineConfig({
               link: "guides/java/method",
             },
             {
+              label: "Internals",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/java/internals",
+              },
+            },
+            {
               label: "Hibernate",
               collapsed: true,
               autogenerate: {
@@ -286,6 +293,22 @@ export default defineConfig({
                 {
                   label: "Gateway",
                   link: "guides/java/springcloud/gateway",
+                },
+                {
+                  label: "Observability",
+                  link: "guides/java/springcloud/observability",
+                },
+                {
+                  label: "ELK Stack",
+                  link: "guides/java/springcloud/elk",
+                },
+                {
+                  label: "Tracing",
+                  link: "guides/java/springcloud/tracing",
+                },
+                {
+                  label: "Exceptions",
+                  link: "guides/java/springcloud/exceptions",
                 },
               ],
             },
