@@ -3,10 +3,6 @@ title: Java Versions
 description: Java versions and features
 ---
 
-# Comprehensive Guide: Java 9 to Java 25 Changes
-
-## **Java 9 (September 2017)**
-
 _The beginning of the 6-month release cycle with major modularization features._
 
 ### 1. **Module System - Java 9 (Project Jigsaw)**

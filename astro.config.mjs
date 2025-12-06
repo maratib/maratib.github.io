@@ -209,6 +209,14 @@ export default defineConfig({
               link: "guides/java/method",
             },
             {
+              label: "CompletableFuture",
+              link: "guides/java/completable-future",
+            },
+            {
+              label: "VirtualThreads",
+              link: "guides/java/virtual-threads",
+            },
+            {
               label: "Internals",
               collapsed: true,
               autogenerate: {
