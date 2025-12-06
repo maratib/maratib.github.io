@@ -201,6 +201,10 @@ export default defineConfig({
               link: "guides/java/java-8-features",
             },
             {
+              label: "Java Versions",
+              link: "guides/java/java-versions",
+            },
+            {
               label: "Method Reference",
               link: "guides/java/method",
             },

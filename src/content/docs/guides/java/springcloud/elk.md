@@ -92,7 +92,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'curl -s http://localhost:9200/_cluster/health | grep -q ''"status":"green"'' || exit 1',
+          'curl -s http: //localhost:9200/_cluster/health | grep -q ''"status":"green"'' || exit 1',
         ]
       interval: 30s
       timeout: 10s
@@ -122,7 +122,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'curl -s http://localhost:9600 | grep -q ''"status":"green"'' || exit 1',
+          'curl -s http: //localhost:9600 | grep -q ''"status":"green"'' || exit 1',
         ]
       interval: 30s
       timeout: 10s
@@ -134,7 +134,7 @@ services:
     container_name: kibana
     environment:
       - SERVER_NAME=kibana
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=http: //elasticsearch:9200
     ports:
       - "5601:5601"
     volumes:
@@ -149,7 +149,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'curl -s http://localhost:5601/api/status | grep -q ''"status":"green"'' || exit 1',
+          'curl -s http: //localhost:5601/api/status | grep -q ''"status":"green"'' || exit 1',
         ]
       interval: 30s
       timeout: 10s
@@ -318,7 +318,7 @@ output {
 
   # Send to Elasticsearch
   elasticsearch {
-    hosts => ["http://elasticsearch:9200"]
+    hosts => ["http: //elasticsearch:9200"]
     index => "%{[@metadata][index_name]}"
     document_id => "%{[@metadata][fingerprint]}"
 
@@ -346,7 +346,7 @@ output {
 # kibana/config/kibana.yml
 server.name: kibana
 server.host: "0.0.0.0"
-elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.hosts: ["http: //elasticsearch:9200"]
 
 # Monitoring
 monitoring.ui.container.elasticsearch.enabled: true
@@ -397,7 +397,7 @@ docker-compose ps
 
 ```bash
 # Check Elasticsearch
-curl -X GET "http://localhost:9200/_cluster/health?pretty"
+curl -X GET "http: //localhost:9200/_cluster/health?pretty"
 
 # Expected response:
 # {
@@ -410,10 +410,10 @@ curl -X GET "http://localhost:9200/_cluster/health?pretty"
 # }
 
 # Check Logstash
-curl -X GET "http://localhost:9600/?pretty"
+curl -X GET "http: //localhost:9600/?pretty"
 
 # Check Kibana (open in browser)
-# http://localhost:5601
+# http: //localhost:5601
 ```
 
 ---
@@ -775,13 +775,13 @@ cd spring-boot-app
 mvn spring-boot:run
 
 # Generate some test requests
-curl http://localhost:8080/api/users/123
-curl -X POST http://localhost:8080/api/users \
+curl http: //localhost:8080/api/users/123
+curl -X POST http: //localhost:8080/api/users \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com"}'
 
 # Generate error logs
-curl http://localhost:8080/api/users/nonexistent
+curl http: //localhost:8080/api/users/nonexistent
 ```
 
 ---
@@ -790,7 +790,7 @@ curl http://localhost:8080/api/users/nonexistent
 
 ### **Step 1: Access Kibana**
 
-1. Open browser: `http://localhost:5601`
+1. Open browser: `http: //localhost:5601`
 2. Wait for Kibana to load (may take 1-2 minutes on first start)
 
 ### **Step 2: Create Index Pattern**
@@ -1176,12 +1176,12 @@ sleep 60
 
 # Verify installation
 echo "✅ Verifying installation..."
-curl -s http://localhost:9200/_cluster/health | grep -q '"status":"green"' && echo "Elasticsearch: ✓" || echo "Elasticsearch: ✗"
-curl -s http://localhost:9600 | grep -q '"status":"green"' && echo "Logstash: ✓" || echo "Logstash: ✗"
+curl -s http: //localhost:9200/_cluster/health | grep -q '"status":"green"' && echo "Elasticsearch: ✓" || echo "Elasticsearch: ✗"
+curl -s http: //localhost:9600 | grep -q '"status":"green"' && echo "Logstash: ✓" || echo "Logstash: ✗"
 
 echo "🎉 ELK Stack is running!"
-echo "🔗 Access Kibana at: http://localhost:5601"
-echo "📊 Elasticsearch API: http://localhost:9200"
+echo "🔗 Access Kibana at: http: //localhost:5601"
+echo "📊 Elasticsearch API: http: //localhost:9200"
 echo "📨 Logstash TCP input: localhost:5000"
 ```
 
@@ -1199,5 +1199,5 @@ echo "📨 Logstash TCP input: localhost:5000"
 
 ### **Access Points:**
 
-- **Kibana UI**: http://localhost:5601
-- **Elasticsearch API**: http://localhost:920
+- **Kibana UI**: http: //localhost:5601
+- **Elasticsearch API**: http: //localhost:920
