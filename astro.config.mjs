@@ -217,6 +217,17 @@ export default defineConfig({
               link: "guides/java/virtual-threads",
             },
             {
+              label: "Garbage Collection",
+              link: "guides/java/gc",
+            },
+            {
+              label: "Patterns",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/java/patterns",
+              },
+            },
+            {
               label: "Internals",
               collapsed: true,
               autogenerate: {
