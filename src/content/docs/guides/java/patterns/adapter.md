@@ -2,7 +2,7 @@
 title: Adapter Pattern
 description: Java Adapter Pattern (STRUCTURAL PATTERN)
 sidebar:
-  order: 3
+  order: 4
 ---
 
 _Java Adapter Pattern (STRUCTURAL PATTERN)_

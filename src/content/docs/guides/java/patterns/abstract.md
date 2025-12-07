@@ -7,7 +7,7 @@ sidebar:
 
 _Java Factory Pattern (CREATIONAL PATTERN)_
 
-_**Abstract Factory Pattern**: Creates **matching sets of related objects** - ensures all components work together harmoniously, like furniture from the same design collection._
+_Creates **families of related objects** without specifying their concrete classes._
 
 **Abstract Factory Pattern**: Creates **matching sets of related objects** - ensures all components work together harmoniously, like furniture from the same design collection.
 

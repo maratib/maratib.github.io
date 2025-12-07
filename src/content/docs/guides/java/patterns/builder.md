@@ -2,7 +2,7 @@
 title: Builder Pattern
 description: Java Builder Pattern (CREATIONAL PATTERN)
 sidebar:
-  order: 2
+  order: 3
 ---
 
 _Java Builder Pattern (CREATIONAL PATTERN)_

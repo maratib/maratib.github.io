@@ -2,7 +2,7 @@
 title: Facade Pattern
 description: Java Facade Pattern (STRUCTURAL PATTERN)
 sidebar:
-  order: 4
+  order: 5
 ---
 
 _Java Facade Pattern (STRUCTURAL PATTERN)_
