@@ -221,6 +221,10 @@ export default defineConfig({
               link: "guides/java/gc",
             },
             {
+              label: "Maven",
+              link: "guides/java/maven",
+            },
+            {
               label: "Patterns",
               collapsed: true,
               autogenerate: {
