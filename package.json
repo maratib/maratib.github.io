@@ -22,6 +22,11 @@
   },
   "devDependencies": {
     "sass": "^1.91.0",
-    "starlight-links-validator": "^0.17.1"
+    "starlight-links-validator": "^0.17.1",
+    "@types/bun": "latest"
+  },
+  "private": true,
+  "peerDependencies": {
+    "typescript": "^5"
   }
 }

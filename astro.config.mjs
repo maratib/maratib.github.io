@@ -399,6 +399,13 @@ export default defineConfig({
           collapsed: true,
           items: [
             {
+              label: "Bun + React Native",
+              collapsed: true,
+              autogenerate: {
+                directory: "guides/reactnative/bun",
+              },
+            },
+            {
               label: "React Native Learning Course",
               link: "guides/reactnative/react-native-learning-course",
             },
@@ -430,16 +437,17 @@ export default defineConfig({
               label: "Navigation Options",
               collapsed: true,
               autogenerate: {
-                directory: "guides/react-native/navigation-options",
+                directory: "guides/reactnative/navigation-options",
               },
             },
             {
               label: "Tips and Tricks",
               collapsed: true,
               autogenerate: {
-                directory: "guides/react-native/tips-and-tricks",
+                directory: "guides/reactnative/tips-and-tricks",
               },
             },
+
           ],
         },
         {
