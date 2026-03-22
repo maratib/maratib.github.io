@@ -20,7 +20,7 @@ This is how real fintech / SaaS apps handle auth.
 
 ---
 
-# 🧠 1. Architecture Overview
+## 🧠 1. Architecture Overview
 
 ```
 Login → Receive access + refresh token
@@ -36,9 +36,9 @@ If refresh fails → logout user
 
 ---
 
-# 🔒 2. Secure Storage Layer
+## 🔒 2. Secure Storage Layer
 
-## 📁 `src/services/storage/secure.ts`
+### 📁 `src/services/storage/secure.ts`
 
 ```ts
 import * as SecureStore from 'expo-secure-store';
@@ -60,9 +60,9 @@ export const secureStorage = {
 
 ---
 
-# 🧠 3. Auth Store (Zustand)
+## 🧠 3. Auth Store (Zustand)
 
-## 📁 `src/features/auth/store.ts`
+### 📁 `src/features/auth/store.ts`
 
 ```ts
 import { create } from 'zustand';
@@ -88,9 +88,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 ---
 
-# 🔌 4. API Client with Auto Token Injection
+## 🔌 4. API Client with Auto Token Injection
 
-## 📁 `src/services/api/client.ts`
+### 📁 `src/services/api/client.ts`
 
 ```ts
 import axios from 'axios';
@@ -113,9 +113,9 @@ apiClient.interceptors.request.use((config) => {
 
 ---
 
-# 🔄 5. Refresh Token Logic (CRITICAL)
+## 🔄 5. Refresh Token Logic (CRITICAL)
 
-## 📁 `src/services/api/refresh.ts`
+### 📁 `src/services/api/refresh.ts`
 
 ```ts
 import { apiClient } from './client';
@@ -177,7 +177,7 @@ export const handleTokenRefresh = async (error: any) => {
 
 ---
 
-## 🔌 Attach to Axios
+### 🔌 Attach to Axios
 
 ```ts
 apiClient.interceptors.response.use(
@@ -188,9 +188,9 @@ apiClient.interceptors.response.use(
 
 ---
 
-# 🔐 6. Persist Tokens Securely
+## 🔐 6. Persist Tokens Securely
 
-## 📁 `src/features/auth/persist.ts`
+### 📁 `src/features/auth/persist.ts`
 
 ```ts
 import { secureStorage } from '@/services/storage/secure';
@@ -221,9 +221,9 @@ export const clearTokens = async () => {
 
 ---
 
-# 🔑 7. Login Flow
+## 🔑 7. Login Flow
 
-## 📁 `src/features/auth/api.ts`
+### 📁 `src/features/auth/api.ts`
 
 ```ts
 import { apiClient } from '@/services/api/client';
@@ -240,7 +240,7 @@ export const login = async (email: string, password: string) => {
 
 ---
 
-## 📁 `src/features/auth/hooks.ts`
+### 📁 `src/features/auth/hooks.ts`
 
 ```ts
 import { useMutation } from '@tanstack/react-query';
@@ -265,7 +265,7 @@ export const useLogin = () => {
 
 ---
 
-# 🚪 8. Logout Flow
+## 🚪 8. Logout Flow
 
 ```ts
 import { clearTokens } from './persist';
@@ -283,9 +283,9 @@ export const useLogout = () => {
 
 ---
 
-# 🔄 9. App Initialization (Auto Login)
+## 🔄 9. App Initialization (Auto Login)
 
-## 📁 `app/_layout.tsx`
+### 📁 `app/_layout.tsx`
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -307,7 +307,7 @@ export default function RootLayout() {
 
 ---
 
-# 🛡️ 10. Protect Routes
+## 🛡️ 10. Protect Routes
 
 ```ts
 const token = useAuthStore((s) => s.accessToken);
@@ -319,7 +319,7 @@ if (!token) {
 
 ---
 
-# 🚀 Real Production Behavior
+## 🚀 Real Production Behavior
 
 * App starts → tokens loaded from secure storage
 * Requests auto include JWT
@@ -329,7 +329,7 @@ if (!token) {
 
 ---
 
-# ⚠️ Critical Best Practices
+## ⚠️ Critical Best Practices
 
 ✅ Always use **refresh token rotation**
 ✅ Keep access token short-lived (5–15 min)
@@ -339,7 +339,7 @@ if (!token) {
 
 ---
 
-# 🔥 Senior-Level Enhancements
+## 🔥 Senior-Level Enhancements
 
 * Biometric unlock (FaceID / Fingerprint)
 * Token binding to device
