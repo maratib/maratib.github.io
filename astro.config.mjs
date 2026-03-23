@@ -48,6 +48,11 @@ export default defineConfig({
           link: "/guides/courses",
         },
         {
+          label: "Docker",
+          collapsed: true,
+          autogenerate: { directory: "guides/docker" },
+        },
+        {
           label: "Basics",
           collapsed: true,
           autogenerate: { directory: "guides/basics" },
@@ -62,6 +67,7 @@ export default defineConfig({
           collapsed: true,
           autogenerate: { directory: "guides/sql" },
         },
+
         {
           label: "Typescript",
           collapsed: true,
