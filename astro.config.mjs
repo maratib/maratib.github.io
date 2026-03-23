@@ -48,15 +48,16 @@ export default defineConfig({
           link: "/guides/courses",
         },
         {
-          label: "Docker",
-          collapsed: true,
-          autogenerate: { directory: "guides/docker" },
-        },
-        {
           label: "Basics",
           collapsed: true,
           autogenerate: { directory: "guides/basics" },
         },
+        {
+          label: "Docker",
+          collapsed: true,
+          autogenerate: { directory: "guides/docker" },
+        },
+
         {
           label: "Angular",
           collapsed: true,
