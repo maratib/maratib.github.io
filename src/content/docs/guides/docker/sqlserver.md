@@ -5,7 +5,7 @@ date: 2026-03-23
 author: maratib
 featured: true
 sidebar:
-  order: 3
+  order: 4
 ---
 
 SQL Server is not natively supported by MacOS, so we will install it via Docker step by step.
