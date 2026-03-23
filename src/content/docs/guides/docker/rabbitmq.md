@@ -30,7 +30,8 @@ docker ps
 ```
 You should see a container named rabbitmq with the status Up.
 ### 4. Access the RabbitMQ Management Console 
-by opening a web browser and navigating to http://localhost:15672/. The default username and password for the management console are both guest. 
+by opening a web browser and navigating to `localhost:15672`.   
+The default username and password for the management console are both guest. 
 
 ### Optional: Persisting Data
 To ensure your data (messages, user definitions, etc.) is not lost when the container is stopped or removed, mount a local directory as a volume to the container's data directory (`/var/lib/rabbitmq`). 
