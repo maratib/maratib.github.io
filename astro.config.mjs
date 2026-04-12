@@ -458,6 +458,16 @@ export default defineConfig({
           ],
         },
         {
+          label: "AWS",
+          collapsed: true,
+          autogenerate: { directory: "guides/aws", collapsed: true },
+        },
+        {
+          label: "Salesforce",
+          collapsed: true,
+          autogenerate: { directory: "guides/salesforce", collapsed: true },
+        },
+        {
           label: "Starlight",
           collapsed: true,
           autogenerate: { directory: "guides/starlight", collapsed: true },
