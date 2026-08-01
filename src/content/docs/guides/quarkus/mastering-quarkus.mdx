@@ -1,0 +1,146 @@
+---
+title: Mastering Quarkus eBook
+description: A complete guide to mastering Quarkus development.
+date: 2026-08-01
+tags:
+  - quarkus
+  - java
+  - ebook
+sidebar:
+  order: 1
+---
+
+import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+
+# Mastering Quarkus: Supersonic Subatomic Java
+
+Welcome to the official page for **Mastering Quarkus: Supersonic Subatomic Java**. This eBook provides a hands-on, deep-dive guide to building high-performance, cloud-native Java applications using the Quarkus framework. 
+
+Whether you are looking to build lightning-fast REST APIs, implement reactive architectures, or compile your services to native binaries with GraalVM, this guide has you covered.
+
+<div class="ebook-container">
+  <div class="ebook-image-wrapper">
+    <img src="/img/quarkus/mastering-quarkus-cover.png" alt="Mastering Quarkus eBook Cover" class="ebook-cover" />
+  </div>
+  <div class="ebook-details">
+    <h3>Why Read This Book?</h3>
+    <p>
+      Java is no longer just for heavyweight, slow-startup enterprise applications. With Quarkus, you get the familiarity of the Java ecosystem combined with the raw speed and resource efficiency required for modern serverless and Kubernetes environments.
+    </p>
+    <p>
+      This eBook walks you through step-by-step implementations, real-world patterns, and optimization techniques.
+    </p>
+    
+    <a href="/pdf/mastering-quarkus.pdf" download="mastering-quarkus.pdf" class="download-btn">
+      <span>📥 Download PDF (Free)</span>
+    </a>
+  </div>
+</div>
+
+<style>{`
+  .ebook-container {
+    display: flex;
+    flex-direction: row;
+    gap: 2.5rem;
+    align-items: flex-start;
+    margin-top: 2rem;
+    margin-bottom: 2.5rem;
+  }
+  .ebook-image-wrapper {
+    flex: 1;
+    min-width: 250px;
+    max-width: 320px;
+  }
+  .ebook-cover {
+    width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease;
+  }
+  .ebook-cover:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  }
+  .ebook-details {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .ebook-details h3 {
+    margin-top: 0 !important;
+    font-size: 1.6rem !important;
+  }
+  .download-btn {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white !important;
+    padding: 0.9rem 1.8rem;
+    border-radius: 50px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    text-decoration: none !important;
+    margin-top: 1.5rem;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.6);
+    background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  }
+  .download-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4);
+  }
+  @media (max-width: 768px) {
+    .ebook-container {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 1.5rem;
+    }
+    .ebook-details {
+      align-items: center;
+    }
+    .download-btn {
+      align-self: center;
+    }
+  }
+`}</style>
+
+---
+
+## What You'll Learn
+
+Explore the core features of Quarkus through structured modules:
+
+<CardGrid>
+  <Card title="Container-First Java" icon="rocket">
+    Understand the architecture of **Supersonic Subatomic Java**, bytecode enhancement, build-time boot processes, and how Quarkus minimizes memory footprint.
+  </Card>
+  <Card title="Database Integration" icon="document">
+    Simplify data persistence using **Hibernate ORM with Panache**. Write less boilerplate code with clean Active Record and Repository patterns.
+  </Card>
+  <Card title="Reactive Programming" icon="random">
+    Build highly reactive APIs using **SmallRye Mutiny**. Seamlessly mix reactive and imperative code for high-throughput messaging.
+  </Card>
+  <Card title="Native Compilations" icon="setting">
+    Configure and build native executables with **GraalVM** to achieve sub-millisecond startup times and minimal RSS memory consumption.
+  </Card>
+</CardGrid>
+
+---
+
+## eBook Details
+
+<Aside type="note" title="Book Details">
+- **Format**: PDF
+- **Size**: ~2.3 MB
+- **Pages**: 500+
+- **Version**: Fully updated for Quarkus 3.x
+</Aside>
