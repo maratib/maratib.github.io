@@ -468,6 +468,11 @@ export default defineConfig({
           autogenerate: { directory: "guides/salesforce", collapsed: true },
         },
         {
+          label: "Quarkus",
+          collapsed: true,
+          autogenerate: { directory: "guides/quarkus", collapsed: true },
+        },
+        {
           label: "Starlight",
           collapsed: true,
           autogenerate: { directory: "guides/starlight", collapsed: true },

@@ -1,0 +1,37 @@
+---
+title: Add Lombok to Quarkus Project
+description: A guide on how to add Lombok to Quarkus Project.
+date: 2026-08-01
+tags:
+  - quarkus
+  - lombok
+---
+
+## 1. Add Lombok Dependency to Quarkus 3.9+ Project
+
+```xml
+  <dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <version>1.18.40</version>
+  </dependency>
+```
+
+## 2. Add Lombok Plugin
+
+```xml
+  <plugin>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>${compiler-plugin.version}</version>
+    <configuration>
+      <parameters>true</parameters>
+      <annotationProcessorPaths>
+        <path>
+          <groupId>org.projectlombok</groupId>
+          <artifactId>lombok</artifactId>
+          <version>1.18.40</version>
+        </path>
+      </annotationProcessorPaths>
+    </configuration>
+  </plugin>
+```
