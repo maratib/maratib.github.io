@@ -1,0 +1,473 @@
+---
+title: Reactive REST Client
+description: Guides on Quarkus communication including REST clients, Kafka, messaging, and reactive streams.
+sidebar:
+  order: 2
+  label: Reactive REST Client 2
+---
+- Defining interfaces, handling errors (response object vs. exceptions), and injecting with `@RestClient`.
+
+### 1. What is the Reactive REST Client in Quarkus?
+
+**Answer:**  
+The Reactive REST Client is Quarkus's implementation of the **MicroProfile Rest Client** specification, built on top of **RESTEasy Reactive** and **Vert.x**. It allows you to define HTTP calls to external services using a declarative, interface‑based approach.
+
+Key features:
+- **Non‑blocking** – returns `Uni`/`Multi` (Mutiny) for reactive programming.
+- **Type‑safe** – uses JAX‑RS annotations (`@Path`, `@GET`, `@POST`, etc.) on the interface.
+- **Build‑time generated** – Quarkus generates the client implementation at build time, eliminating reflection and runtime proxies.
+- **Integrated with CDI** – you inject the client with `@Inject @RestClient`.
+
+---
+
+### 2. How do you add the Reactive REST Client to a Quarkus project?
+
+**Answer:**  
+Add the following extension:
+
+```bash
+quarkus ext add rest-client-reactive
+```
+
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-rest-client-reactive</artifactId>
+</dependency>
+```
+
+For JSON serialization, also add:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-rest-client-reactive-jackson</artifactId>
+</dependency>
+```
+
+---
+
+### 3. How do you define a Reactive REST Client interface?
+
+**Answer:**  
+Define a Java interface with JAX‑RS annotations and mark it with `@RegisterRestClient`:
+
+```java
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+import io.smallrye.mutiny.Uni;
+
+@Path("/api/users")
+@RegisterRestClient(configKey = "user-api")
+public interface UserClient {
+    @GET
+    @Path("/{id}")
+    Uni<User> getUser(@PathParam("id") Long id);
+}
+```
+
+- `@RegisterRestClient` tells Quarkus to generate an implementation.
+- `configKey` – allows you to namespace configuration properties (e.g., `user-api/mp-rest/url`).
+
+---
+
+### 4. How do you inject and use the Reactive REST Client?
+
+**Answer:**  
+Inject it using `@Inject` with the `@RestClient` qualifier:
+
+```java
+@Path("/users")
+@ApplicationScoped
+public class UserResource {
+    @Inject
+    @RestClient
+    UserClient userClient;
+
+    @GET
+    @Path("/{id}")
+    public Uni<User> getUser(@PathParam("id") Long id) {
+        return userClient.getUser(id);
+    }
+}
+```
+
+The `@RestClient` qualifier distinguishes this bean from other CDI beans of the same interface type.
+
+---
+
+### 5. How do you configure the base URL for a REST Client?
+
+**Answer:**  
+Using the `configKey` from `@RegisterRestClient` in `application.properties`:
+
+```properties
+user-api/mp-rest/url=https://api.example.com
+user-api/mp-rest/scope=jakarta.enterprise.context.ApplicationScoped
+```
+
+Or if you don't specify a `configKey`, use the fully qualified class name:
+```properties
+com.example.UserClient/mp-rest/url=https://api.example.com
+```
+
+You can also override the URL at runtime with `@RestClient` and `@ConfigProperty`.
+
+---
+
+### 6. What return types can a Reactive REST Client method have?
+
+**Answer:**  
+The Reactive REST Client supports:
+
+- **Reactive** – `Uni<T>` (single result), `Multi<T>` (stream of results).
+- **Blocking** – `T`, `List<T>`, `Set<T>`, `Response`, `String`, etc.
+
+**Examples:**
+```java
+@GET
+Uni<User> getUser(Long id);           // reactive – single
+
+@GET
+Multi<User> getAllUsers();            // reactive – stream
+
+@GET
+User getUserBlocking(Long id);        // blocking (runs on worker thread)
+```
+
+If you return a blocking type, the client will execute the HTTP call on a worker thread. Returning `Uni`/`Multi` runs it on the event loop.
+
+---
+
+### 7. How do you handle errors and exceptions with the Reactive REST Client?
+
+**Answer:**  
+Errors are propagated as failures in the `Uni`/`Multi` pipeline. By default, any HTTP response status >= 400 throws a `WebApplicationException` (or `ResponseException` in reactive clients).
+
+**Approach 1 – Use `Response` to inspect status manually:**
+```java
+@GET
+Uni<Response> getUserResponse(Long id);
+```
+
+**Approach 2 – Recover with `onFailure()`:**
+```java
+public Uni<User> getUserSafe(Long id) {
+    return userClient.getUser(id)
+        .onFailure(WebApplicationException.class)
+        .recoverWithItem(() -> new User("fallback"));
+}
+```
+
+**Approach 3 – Use exception mappers** (see Q&A #11).
+
+---
+
+### 8. How do you set custom headers on REST Client requests?
+
+**Answer:**  
+Several ways:
+
+**Static headers with `@ClientHeaderParam`:**
+```java
+@ClientHeaderParam(name = "X-API-Key", value = "abc123")
+@GET
+Uni<User> getUser(Long id);
+```
+
+**Dynamic headers using a method:**
+```java
+@ClientHeaderParam(name = "X-Request-Id", value = "{generateRequestId}")
+@GET
+Uni<User> getUser(Long id);
+
+default String generateRequestId() {
+    return UUID.randomUUID().toString();
+}
+```
+
+**Using `@HeaderParam` on method parameters:**
+```java
+@GET
+Uni<User> getUser(@HeaderParam("Authorization") String token, @PathParam("id") Long id);
+```
+
+**Using `ClientHeadersFactory`** for more complex logic (e.g., propagating incoming headers).
+
+---
+
+### 9. How do you propagate incoming request headers to the downstream client?
+
+**Answer:**  
+Implement `ClientHeadersFactory` and register it with `@RegisterClientHeaders`:
+
+```java
+@RegisterClientHeaders(MyHeadersFactory.class)
+@RegisterRestClient(configKey = "user-api")
+public interface UserClient { }
+
+public class MyHeadersFactory implements ClientHeadersFactory {
+    @Override
+    public MultivaluedMap<String, String> update(MultivaluedMap<String, String> incoming,
+                                                  MultivaluedMap<String, String> outgoing) {
+        // Propagate Authorization header from incoming to outgoing
+        String auth = incoming.getFirst("Authorization");
+        if (auth != null) {
+            outgoing.add("Authorization", auth);
+        }
+        return outgoing;
+    }
+}
+```
+
+---
+
+### 10. How do you configure timeouts, retries, and connection settings?
+
+**Answer:**  
+Configure via `application.properties` under the `configKey`:
+
+```properties
+# Connection and read timeouts (milliseconds)
+user-api/mp-rest/connectTimeout=5000
+user-api/mp-rest/readTimeout=10000
+
+# Retry (MicroProfile Fault Tolerance)
+user-api/mp-rest/retry/maxRetries=3
+user-api/mp-rest/retry/delay=1000
+
+# Proxy settings
+user-api/mp-rest/proxyAddress=proxy.example.com
+user-api/mp-rest/proxyPort=8080
+```
+
+Quarkus also allows per‑client custom `HttpClientOptions` via `@RegisterRestClient` with `@RestClientConfig`.
+
+---
+
+### 11. How do you implement a custom exception mapper for REST Client errors?
+
+**Answer:**  
+Implement `ResponseExceptionMapper` to map HTTP error responses to specific exceptions:
+
+```java
+@Provider
+public class UserClientExceptionMapper implements ResponseExceptionMapper<CustomException> {
+    @Override
+    public boolean handles(int status, MultivaluedMap<String, Object> headers) {
+        return status >= 400 && status < 500;
+    }
+
+    @Override
+    public CustomException toThrowable(Response response) {
+        // parse error body from response
+        return new CustomException("Client error: " + response.getStatus());
+    }
+}
+```
+
+Register it with `@RegisterRestClient` or via `META-INF/services` (discovered automatically).
+
+---
+
+### 12. How do you test the Reactive REST Client in Quarkus?
+
+**Answer:**  
+You can use **WireMock** or **MockServer** to stub external services.
+
+**Using `@QuarkusTest` with a mock server:**
+```java
+@QuarkusTest
+public class UserClientTest {
+    @Inject
+    @RestClient
+    UserClient client;
+
+    @Test
+    public void testGetUser() {
+        // Set up WireMock stub for /api/users/1
+        given().when().get("/api/users/1")
+               .then().statusCode(200).body("{\"id\":1,\"name\":\"John\"}");
+
+        User user = client.getUser(1L).await().atMost(Duration.ofSeconds(5));
+        assertEquals("John", user.name);
+    }
+}
+```
+
+Alternatively, mock the client itself using `@InjectMock` with `@RestClient`:
+
+```java
+@InjectMock
+@RestClient
+UserClient userClient;
+
+@Test
+public void testService() {
+    Mockito.when(userClient.getUser(1L))
+           .thenReturn(Uni.createFrom().item(new User("John")));
+    // test code
+}
+```
+
+---
+
+### 13. Can you use the Reactive REST Client with authentication (OAuth2, JWT, Basic)?
+
+**Answer:**  
+Yes.
+
+**Bearer Token (JWT):**
+```java
+@GET
+Uni<User> getUser(@HeaderParam("Authorization") String token);
+```
+Or via `ClientHeadersFactory` to add the token dynamically.
+
+**OAuth2 client credentials:**
+Add `quarkus-oidc-client` extension and configure:
+```properties
+user-api/mp-rest/url=https://api.example.com
+user-api/mp-rest/scope=jakarta.enterprise.context.ApplicationScoped
+quarkus.oidc-client.auth-server-url=https://auth.example.com
+quarkus.oidc-client.client-id=my-client
+quarkus.oidc-client.credentials.secret=secret
+```
+
+Then use `@AccessToken` to obtain the token.
+
+**Basic Auth:** Pass via `@HeaderParam("Authorization")` with `"Basic " + Base64.encode(user:pass)`.
+
+---
+
+### 14. What is the difference between `quarkus-rest-client-reactive` and `quarkus-rest-client` (classic)?
+
+**Answer:**  
+
+| Aspect | Classic (`quarkus-rest-client`) | Reactive (`quarkus-rest-client-reactive`) |
+| :--- | :--- | :--- |
+| **Underlying HTTP client** | Apache HTTP Client (blocking) | Vert.x HTTP Client (non‑blocking) |
+| **Default return types** | Blocking (`T`, `List<T>`) | Non‑blocking (`Uni`/`Multi`) |
+| **Performance** | Good | Better (event‑loop) |
+| **Reactive support** | Limited (via custom wrappers) | Native (`Uni`/`Multi`) |
+| **Recommended in 3.9+** | No (deprecated) | **Yes (default)** |
+
+Quarkus 3.9+ recommends `quarkus-rest-client-reactive` for all new projects.
+
+---
+
+### 15. How do you stream large responses with the Reactive REST Client?
+
+**Answer:**  
+Use `Multi` as the return type. The client streams the HTTP response body chunk by chunk.
+
+```java
+@GET
+Multi<User> getAllUsers();
+```
+
+Each `User` object is deserialized and emitted individually. This is efficient for large datasets – you don't load the entire JSON array into memory at once.
+
+**⚠️ Caution:** The server must support streaming JSON (e.g., Jackson's `@Streaming` or a JSON array stream). Quarkus's REST server handles this out of the box if you return `Multi`.
+
+---
+
+### 16. How do you handle query parameters with the REST Client?
+
+**Answer:**  
+Use `@QueryParam`:
+
+```java
+@GET
+Uni<List<User>> findUsers(@QueryParam("name") String name,
+                          @QueryParam("age") Integer age);
+
+// Call: client.findUsers("John", 30)
+```
+
+For optional parameters, use `@QueryParam` with a default value or `Optional<T>`.
+
+**`@QueryParam` with `Multi`:**
+```java
+@GET
+Multi<User> search(@QueryParam("q") String query);
+```
+
+---
+
+### 17. How do you send a JSON body with POST/PUT requests?
+
+**Answer:**  
+Use `@POST` or `@PUT` with the entity as the method parameter:
+
+```java
+@POST
+Uni<User> createUser(User user);
+
+@PUT
+@Path("/{id}")
+Uni<User> updateUser(@PathParam("id") Long id, User user);
+```
+
+The client automatically serializes the object to JSON (using Jackson) and sets `Content-Type: application/json`.
+
+---
+
+### 18. How does the Reactive REST Client handle multipart form uploads?
+
+**Answer:**  
+Use `@FormParam` with `@Multipart`:
+
+```java
+@POST
+@Path("/upload")
+@Consumes(MediaType.MULTIPART_FORM_DATA)
+Uni<String> uploadFile(@FormParam("file") FileUpload file,
+                       @FormParam("name") String name);
+```
+
+You need the `quarkus-rest-client-reactive-multipart` extension. The client supports streaming large files without loading them entirely into memory.
+
+---
+
+### 19. What is the role of `@RegisterRestClient` and `@RestClient` in CDI?
+
+**Answer:**  
+- `@RegisterRestClient` – Marks the interface as a REST client. Quarkus generates a CDI bean implementation at build time.
+- `@RestClient` – A CDI qualifier used at injection points to tell Quarkus which bean to inject. It distinguishes the REST client from other beans that might implement the same interface.
+
+```java
+@Inject @RestClient UserClient client;  // CDI picks the generated client
+```
+
+---
+
+### 20. What are the common pitfalls with the Reactive REST Client?
+
+**Answer:**  
+
+- **Forgetting `@RestClient` qualifier** – Without it, CDI cannot distinguish the client from other beans, causing ambiguous dependency errors.
+- **Blocking inside reactive pipeline** – If your client returns `Uni` but you call a blocking method (e.g., `Thread.sleep()`), you'll block the event loop. Use `runSubscriptionOn` if necessary.
+- **Not handling errors** – Failing to `.onFailure().recoverWithItem()` can cause the whole `Uni` pipeline to fail and return a 500 error to the user.
+- **Serialization issues** – Ensure your entity classes have public fields or getters/setters, and the Jackson extension is added.
+- **URL misconfiguration** – If the `mp-rest/url` is not set correctly, the client fails at runtime. Quarkus validates this at build time when possible.
+- **Thread‑local context loss** – Security contexts (like `@RequestScoped`) are not propagated across threads in reactive pipelines. Use context propagation or pass state explicitly.
+
+---
+
+### Summary of Key Points for Interviews
+
+| Concept | Detail |
+| :--- | :--- |
+| **Extension** | `quarkus-rest-client-reactive` |
+| **Annotation** | `@RegisterRestClient` on interface, `@Inject @RestClient` on injection |
+| **Reactive return types** | `Uni<T>`, `Multi<T>` (recommended) |
+| **Blocking return types** | `T`, `List<T>` (runs on worker threads) |
+| **Configuration prefix** | `{configKey}/mp-rest/` or `{FQCN}/mp-rest/` |
+| **Error handling** | `onFailure()` on `Uni`/`Multi`, or `Response` inspection |
+| **Headers** | `@ClientHeaderParam`, `@HeaderParam`, `ClientHeadersFactory` |
+| **Timeouts** | `mp-rest/connectTimeout`, `mp-rest/readTimeout` (milliseconds) |
+| **Retries** | `mp-rest/retry/maxRetries`, or use Fault Tolerance extension |
+| **Testing** | WireMock + `@QuarkusTest`, or `@InjectMock` with `@RestClient` |

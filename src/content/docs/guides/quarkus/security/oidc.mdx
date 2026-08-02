@@ -1,0 +1,280 @@
+---
+title: OIDC & JWT AuthenticationSecurity
+description: Guides on Quarkus security including authentication, authorization, OIDC, JWT, and RBAC.
+sidebar:
+  order: 1
+  label: Authentication
+---
+- Securing endpoints with OpenID Connect, configuring the `quarkus-oidc` extension, and validating tokens.
+
+### 1. What's the difference between `quarkus-oidc` and `quarkus-smallrye-jwt` for security?
+
+**Answer:** They serve different purposes and can be used together:
+
+| Aspect | `quarkus-oidc` | `quarkus-smallrye-jwt` |
+| :--- | :--- | :--- |
+| **Primary Use** | Full OIDC flows (Bearer Token, Authorization Code Flow) | Standalone JWT verification & generation |
+| **OIDC Provider** | Requires an OIDC provider (Keycloak, Auth0, etc.) | No external provider needed |
+| **Token Validation** | Validates against provider's issuer & JWK endpoint | Validates using local public key |
+| **When to use** | Production apps with OIDC provider | Simple JWT auth without full OIDC |
+
+In Quarkus 3.9+, `quarkus-oidc` uses `smallrye-jwt` internally to represent bearer tokens as `JsonWebToken`.
+
+---
+
+### 2. How do you add OIDC authentication to a Quarkus project?
+
+**Answer:** Add the extension:
+```bash
+quarkus ext add oidc
+```
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-oidc</artifactId>
+</dependency>
+```
+
+For JWT-only (no OIDC provider), add `smallrye-jwt` and `smallrye-jwt-build`.
+
+---
+
+### 3. What are the two authentication flows supported by `quarkus-oidc`?
+
+**Answer:**
+
+1. **Bearer Token Authentication** – For REST APIs/SPAs. Client sends JWT in `Authorization: Bearer <token>` header. Quarkus validates it.
+
+2. **Authorization Code Flow** – For web apps with server-side rendering. Users are redirected to OIDC provider to log in, then redirected back with a code exchanged for tokens.
+
+Configure with:
+```properties
+# Bearer Token (default)
+quarkus.oidc.application-type=service
+
+# Authorization Code Flow
+quarkus.oidc.application-type=web-app
+```
+
+---
+
+### 4. What are the minimum configuration properties for `quarkus-oidc`?
+
+**Answer:**
+```properties
+quarkus.oidc.auth-server-url=https://auth.example.com/realms/myrealm
+quarkus.oidc.client-id=my-client
+quarkus.oidc.credentials.secret=my-secret
+```
+`auth-server-url` is the OIDC provider's well-known configuration endpoint. For Bearer Token auth (service apps), `client-id` and `credentials.secret` are optional if the provider doesn't require client authentication.
+
+---
+
+### 5. What is `JsonWebToken` and how do you inject it?
+
+**Answer:** `JsonWebToken` (from `org.eclipse.microprofile.jwt`) represents the authenticated user's JWT. Inject it into any CDI bean:
+```java
+@Inject
+JsonWebToken jwt;
+
+@GET
+@Path("/me")
+public String getCurrentUser() {
+    return jwt.getName(); // returns the "sub" claim
+}
+```
+Supported injection scopes include `@RequestScoped`, `@ApplicationScoped`, and `@Dependent`.
+
+---
+
+### 6. How do you secure endpoints with role-based access control (RBAC)?
+
+**Answer:** Use `@RolesAllowed`, `@PermitAll`, or `@DenyAll`:
+```java
+@Path("/api")
+@ApplicationScoped
+public class UserResource {
+    @GET
+    @Path("/admin")
+    @RolesAllowed("admin")
+    public String adminOnly() { return "Admin data"; }
+
+    @GET
+    @Path("/user")
+    @RolesAllowed({"user", "admin"})
+    public String userEndpoint() { return "User data"; }
+
+    @GET
+    @Path("/public")
+    @PermitAll
+    public String publicEndpoint() { return "Public data"; }
+}
+```
+
+**Important:** For Quarkus to recognize roles from a JWT, they must be in the `groups` claim by default. Keycloak puts roles in `realm_access.roles` or `resource_access.{client}.roles` – you'll need to map them:
+```properties
+quarkus.oidc.roles.role-claim-path=realm_access/roles
+```
+Or:
+```properties
+quarkus.oidc.roles.role-claim-path=groups
+```
+
+---
+
+### 7. How does Quarkus validate JWT tokens with `quarkus-oidc`?
+
+**Answer:** For each request with an `Authorization: Bearer <token>` header, Quarkus:
+1. Extracts the JWT.
+2. Fetches OIDC provider's configuration from `auth-server-url/.well-known/openid-configuration`.
+3. Retrieves the JSON Web Key Set (JWKS) from the provider's `jwks_uri`.
+4. Validates: signature (using the public key), issuer (`iss` claim), audience (`aud` claim), and expiration (`exp` claim).
+5. If valid, creates a `SecurityIdentity` with roles from the `groups` claim.
+
+---
+
+### 8. How do you customize the 401/403 response in Quarkus OIDC?
+
+**Answer:** Implement an `ExceptionMapper`:
+```java
+@Provider
+public class CustomOidcExceptionMapper implements ExceptionMapper<AuthenticationFailedException> {
+    @Override
+    public Response toResponse(AuthenticationFailedException exception) {
+        return Response.status(Response.Status.UNAUTHORIZED)
+                       .entity(new ErrorResponse("Authentication failed: " + exception.getMessage()))
+                       .build();
+    }
+}
+```
+Or for 403 (authorization failure), map `ForbiddenException`.
+
+---
+
+### 9. How do you test OIDC-secured endpoints in Quarkus?
+
+**Answer:** Use `@TestSecurity` and `@OidcSecurity` annotations:
+```java
+@QuarkusTest
+public class UserResourceTest {
+    @Test
+    @TestSecurity(user = "testuser", roles = {"admin"})
+    public void testAdminEndpoint() {
+        given().when().get("/api/admin")
+               .then().statusCode(200);
+    }
+
+    @Test
+    @TestSecurity(user = "testuser", roles = {"user"})
+    public void testUserEndpoint() {
+        given().when().get("/api/admin")
+               .then().statusCode(403); // user role can't access admin
+    }
+}
+```
+`@TestSecurity` creates a mock `JsonWebToken` with the specified user and roles.
+
+For more realistic tests, use `OidcWiremockTestResource` to mock the OIDC provider.
+
+---
+
+### 10. How do you propagate a JWT token from an incoming request to an outgoing REST Client call?
+
+**Answer:** Add the `quarkus-rest-client-oidc-token-propagation` extension:
+```bash
+quarkus ext add io.quarkus:quarkus-rest-client-oidc-token-propagation
+```
+Then annotate your REST Client interface:
+```java
+@RegisterRestClient
+@AccessToken  // propagates the current request's token
+public interface SecureServiceClient {
+    @GET
+    @Path("/api/data")
+    String getData();
+}
+```
+The `@AccessToken` filter automatically adds the incoming bearer token to the outgoing `Authorization` header.
+
+For client credentials flow (no incoming token), use `@OidcClientFilter` with `quarkus-rest-client-oidc-filter`.
+
+---
+
+### 11. How do you read custom claims from a JWT?
+
+**Answer:** Use the `JsonWebToken` interface:
+```java
+@Inject
+JsonWebToken jwt;
+
+public String getCustomClaim() {
+    return jwt.getClaim("custom-claim");
+}
+```
+Or with a typed claim:
+```java
+List<String> roles = jwt.getClaim("custom-roles");
+```
+
+---
+
+### 12. What is OIDC multi-tenancy and how do you configure it?
+
+**Answer:** Multi-tenancy allows a single Quarkus app to serve multiple OIDC tenants (realms or providers).
+
+**Static multi-tenancy** (configured in `application.properties`):
+```properties
+quarkus.oidc.tenant1.auth-server-url=https://keycloak.example.com/realms/tenant1
+quarkus.oidc.tenant1.client-id=client1
+quarkus.oidc.tenant2.auth-server-url=https://keycloak.example.com/realms/tenant2
+quarkus.oidc.tenant2.client-id=client2
+```
+Quarkus resolves the tenant from the request (e.g., subdomain, header, or path).
+
+**Dynamic multi-tenancy** – implement `TenantConfigResolver` to resolve tenant configuration programmatically.
+
+---
+
+### 13. What is CVE-2023-5675 and how does it affect Quarkus?
+
+**Answer:** CVE-2023-5675 is an authorization flaw in RESTEasy Reactive and Classic. When `quarkus.security.jaxrs.deny-unannotated-endpoints` or `quarkus.security.jaxrs.default-roles-allowed` are used, endpoints declared in abstract classes or customized by annotation processors may not have authorization enforced.
+
+**Fixed in:** Quarkus 3.6.9, 3.7.1, and 3.8.x LTS.
+
+**Mitigation:** If on an older version, explicitly annotate all endpoints with `@PermitAll`, `@DenyAll`, or `@RolesAllowed`.
+
+---
+
+### 14. What security vulnerabilities exist in Quarkus OIDC?
+
+**Answer:** A known flaw allows token leakage in the authorization code flow when using insecure HTTP. Always use **HTTPS** in production. The fix is included in Quarkus 3.2.10.Final and later.
+
+**Best practices:**
+- Always use HTTPS for OIDC endpoints
+- Keep Quarkus updated to latest patch versions
+- Use short-lived access tokens
+- Validate all JWT claims (issuer, audience, expiration)
+
+---
+
+### 15. Can you mix OIDC authentication with Basic Authentication in the same Quarkus app?
+
+**Answer:** Yes, but it requires custom configuration. Use different paths or annotation-based security with multiple `@AuthenticationMechanism` implementations. The recommended approach is using OIDC for all endpoints and using Basic Auth only for specific paths via `quarkus.http.auth.basic` and path-based security policies.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **Extensions** | `quarkus-oidc` (full OIDC), `quarkus-smallrye-jwt` (standalone JWT) |
+| **Flows** | Bearer Token (APIs), Authorization Code Flow (web apps) |
+| **Key Properties** | `auth-server-url`, `client-id`, `credentials.secret` |
+| **RBAC** | `@RolesAllowed`, `@PermitAll`, `@DenyAll`; roles from `groups` claim |
+| **Token Injection** | `@Inject JsonWebToken` |
+| **Testing** | `@TestSecurity` + `@OidcSecurity` |
+| **Token Propagation** | `@AccessToken` with `quarkus-rest-client-oidc-token-propagation` |
+| **Multi-tenancy** | Static (`application.properties`) or dynamic (`TenantConfigResolver`) |
+| **CVE-2023-5675** | Authorization flaw; fixed in 3.6.9/3.7.1/3.8.x |
+

@@ -1,0 +1,337 @@
+---
+title: Transactions
+description: Reactive Panache on Quarkus.
+sidebar:
+  order: 10
+  label: Transactions
+---
+
+### 1. How does transaction management work in Quarkus?
+
+**Answer:**  
+Quarkus uses **ArC** (its CDI implementation) with build‑time bytecode weaving to manage transactions. When you annotate a method with `@Transactional`, Quarkus generates an interceptor at build time that wraps your method with transaction begin/commit/rollback logic. This is different from traditional runtime proxies – it's **faster** and works seamlessly in native images.
+
+Quarkus supports two distinct transaction models:
+
+- **Imperative (blocking)** – Uses `@Transactional` (from `jakarta.transaction.Transactional`) with JTA (Narayana) for JDBC/Hibernate ORM.
+- **Reactive (non‑blocking)** – Uses **programmatic** transactions with `Panache.withTransaction()` or `Session.withTransaction()` for Hibernate Reactive.
+
+---
+
+### 2. What is the `@Transactional` annotation and what does it do?
+
+**Answer:**  
+`@Transactional` (from `jakarta.transaction.Transactional`) is a declarative annotation that marks a method as requiring a transaction. When invoked, Quarkus:
+
+1. Begins a new transaction or joins an existing one (depending on `TxType`).
+2. Executes your method.
+3. Commits the transaction if the method completes without throwing an exception.
+4. Rolls back the transaction if any unchecked exception (or checked exception marked with `@Transactional(rollbackOn)`) is thrown.
+
+It works **only on blocking methods** that run on worker threads.
+
+---
+
+### 3. What are the different `TxType` values and when do you use them?
+
+**Answer:**  
+`TxType` defines how a method behaves regarding transaction boundaries:
+
+| TxType | Behavior |
+| :--- | :--- |
+| `REQUIRED` (default) | Joins an existing transaction, or creates a new one if none exists. |
+| `REQUIRES_NEW` | Suspends the current transaction (if any) and creates a new one. |
+| `MANDATORY` | Must be called within an existing transaction; throws an exception otherwise. |
+| `SUPPORTS` | If a transaction exists, joins it; otherwise, runs without a transaction. |
+| `NOT_SUPPORTED` | If a transaction exists, suspends it; runs without a transaction. |
+| `NEVER` | Must not be called within a transaction; throws an exception if one exists. |
+
+**Example:**
+```java
+@Transactional(TxType.REQUIRES_NEW)
+public void createAuditLog() {
+    // Always runs in a fresh, independent transaction
+}
+```
+
+---
+
+### 4. How do you control rollback behavior with `@Transactional`?
+
+**Answer:**  
+By default, `@Transactional` rolls back on:
+
+- **Runtime exceptions** (unchecked) – e.g., `NullPointerException`, `IllegalArgumentException`.
+- **Errors** (e.g., `OutOfMemoryError`).
+
+It does **not** roll back on checked exceptions (e.g., `IOException`) unless you explicitly configure it.
+
+**Custom rollback:**
+```java
+@Transactional(rollbackOn = IOException.class, dontRollbackOn = IllegalArgumentException.class)
+public void process() throws IOException {
+    // rolls back on IOException, but not on IllegalArgumentException
+}
+```
+
+---
+
+### 5. What is the difference between `@Transactional` (Jakarta) and `@Transactional` (Spring)?
+
+**Answer:**  
+In Quarkus, `@Transactional` comes from **`jakarta.transaction.Transactional`** (Jakarta EE), not Spring. The key differences:
+
+- **Rollback defaults** – Jakarta rolls back on `RuntimeException`; Spring rolls back on `RuntimeException` and `Error` but does not roll back on checked exceptions by default.
+- **Propagation** – Both have similar propagation settings, but Jakarta's `TxType` is slightly different from Spring's `Propagation`.
+- **Threading** – Quarkus's `@Transactional` is **not** thread‑safe across reactive boundaries; it expects to run on the same thread from start to finish.
+
+**💡 Tip:** Always use `jakarta.transaction.Transactional` in Quarkus, never `org.springframework.transaction.annotation.Transactional`.
+
+---
+
+### 6. Can you use `@Transactional` on a REST endpoint (JAX-RS resource)?
+
+**Answer:**  
+Yes, but it's generally not recommended. Placing `@Transactional` directly on a REST resource ties your transaction boundary to the HTTP request lifecycle. It works, but best practice is to keep transaction logic in a separate **service layer** (e.g., `@ApplicationScoped` service) and inject that into the resource. This keeps your REST layer thin and focused on HTTP concerns.
+
+```java
+@Path("/users")
+@ApplicationScoped
+public class UserResource {
+    @Inject
+    UserService service;
+
+    @POST
+    public Response create(User user) {
+        service.createUser(user); // transaction lives in the service
+        return Response.ok().build();
+    }
+}
+```
+
+---
+
+### 7. What happens if you call a `@Transactional` method from within the same class?
+
+**Answer:**  
+In Quarkus (and CDI in general), `@Transactional` is implemented via **interceptors**. If you call a `@Transactional` method directly from another method inside the same class (self‑invocation), the interceptor is **not** invoked – the call bypasses the proxy and the transaction does **not** start.
+
+**Solution:** Inject the bean into itself and call through the proxy:
+```java
+@ApplicationScoped
+public class UserService {
+    @Inject
+    UserService self; // inject proxy
+
+    public void outerMethod() {
+        self.innerMethod(); // transaction starts correctly
+    }
+
+    @Transactional
+    public void innerMethod() { }
+}
+```
+
+---
+
+### 8. How do you handle transactions with reactive Hibernate Panache?
+
+**Answer:**  
+In reactive Panache, you **cannot** use `@Transactional`. Instead, you use **programmatic reactive transactions** via `Panache.withTransaction()` or `Session.withTransaction()`. These methods return `Uni` and manage the transaction across asynchronous boundaries.
+
+```java
+@ApplicationScoped
+public class ReactiveUserService {
+    public Uni<User> createUser(String name) {
+        return Panache.withTransaction(() -> {
+            User user = new User();
+            user.name = name;
+            return user.persist().replaceWith(user);
+        });
+    }
+}
+```
+
+If any failure occurs in the `Uni` pipeline, the transaction is automatically rolled back.
+
+---
+
+### 9. How do you combine multiple persistence operations in a single reactive transaction?
+
+**Answer:**  
+Wrap all operations inside a single `withTransaction()` block. The lambda must return a `Uni`, and the transaction commits only when that `Uni` completes successfully.
+
+```java
+public Uni<Void> transferMoney(Long fromId, Long toId, BigDecimal amount) {
+    return Panache.withTransaction(() -> {
+        return User.findById(fromId)
+            .chain(from -> User.findById(toId))
+            .chain(tuple -> {
+                User from = tuple.getItem1();
+                User to = tuple.getItem2();
+                from.balance = from.balance.subtract(amount);
+                to.balance = to.balance.add(amount);
+                return Uni.combine().all().unis(from.persist(), to.persist()).discardItems();
+            });
+    });
+}
+```
+
+All `.persist()` calls share the same session and transaction context.
+
+---
+
+### 10. What is the difference between `Panache.withTransaction()` and `Session.withTransaction()`?
+
+**Answer:**
+
+- **`Panache.withTransaction()`** – A static convenience method that automatically obtains the current reactive session and wraps your logic in a transaction. It's the simplest way.
+- **`Session.withTransaction(Function<Session, Uni<T>>)`** – Lower‑level method on the Hibernate Reactive `Session` itself. It gives you direct access to the `Session` instance, which is useful for complex native queries, detached entities, or advanced session operations.
+
+Most of the time, `Panache.withTransaction()` is sufficient and recommended.
+
+---
+
+### 11. How do you propagate transactions across microservices (distributed transactions)?
+
+**Answer:**  
+Quarkus supports **MicroProfile LRA** (Long Running Actions) for distributed transaction coordination across microservices using the Saga pattern. You annotate methods with `@LRA` (from `org.eclipse.microprofile.lra.annotation.LRA`) to define compensating actions.
+
+For simpler cases, you can also use **eventual consistency** with reactive messaging (Kafka) and idempotent consumers instead of distributed ACID transactions.
+
+---
+
+### 12. Can you mix `@Transactional` and reactive Panache in the same code path?
+
+**Answer:**  
+No. `@Transactional` works with **blocking** JDBC/Hibernate ORM and a JTA transaction manager. Reactive Panache uses a completely different non‑blocking driver and session. You cannot mix them within the same call chain.
+
+If you have a service that uses reactive Panache, it must stay fully reactive (returning `Uni`/`Multi`). If you have a service that uses blocking Panache, it must stay blocking (or use `@Blocking` at the REST boundary).
+
+---
+
+### 13. How do you handle transaction timeouts in Quarkus?
+
+**Answer:**  
+For **imperative** transactions, use `@Transactional(timeout = 5)` (value in seconds) to set a timeout. If the transaction exceeds the timeout, it is automatically rolled back.
+
+```java
+@Transactional(timeout = 10) // 10 seconds
+public void longRunningProcess() { }
+```
+
+For **reactive** transactions, you can set a timeout on the `Uni` itself:
+```java
+return Panache.withTransaction(() -> doSomething())
+    .ifNoItem().after(Duration.ofSeconds(10)).fail();
+```
+
+---
+
+### 14. What is the default transaction isolation level in Quarkus, and how can you change it?
+
+**Answer:**  
+Quarkus (Hibernate) defaults to the database's default isolation level (typically `READ_COMMITTED` for PostgreSQL/MySQL). You can change it globally in `application.properties`:
+
+```properties
+quarkus.datasource.jdbc.isolation-level=READ_COMMITTED
+# or REPEATABLE_READ, SERIALIZABLE, READ_UNCOMMITTED
+```
+
+**⚠️ Note:** Isolation levels are **not** set via `@Transactional` in Jakarta EE (unlike Spring). You must configure it at the datasource level.
+
+---
+
+### 15. How does Quarkus handle transaction suspension in `REQUIRES_NEW` and `NOT_SUPPORTED`?
+
+**Answer:**  
+Quarkus uses the Narayana transaction manager (JTA). When a method with `REQUIRES_NEW` is called:
+
+1. The current transaction (if any) is **suspended**.
+2. A new transaction is created and started.
+3. After the method completes, the new transaction is committed/rolled back.
+4. The original transaction is **resumed**.
+
+This suspension/resume operation is thread‑local. In reactive programming, thread‑local context is not reliable (since different parts of the pipeline may run on different threads), which is another reason why `@Transactional` is **not supported** in reactive code.
+
+---
+
+### 16. How do you handle `@Transactional` in native images?
+
+**Answer:**  
+Because Quarkus weaves the transaction interceptor at build time, `@Transactional` works out of the box in native images. The transaction manager (Narayana) and all required bytecode are pre‑processed, so no reflection configuration is needed. This is a major advantage over traditional JTA implementations.
+
+---
+
+### 17. What is the purpose of `@QuarkusTransaction` (Quarkus-specific annotation)?
+
+**Answer:**  
+`@QuarkusTransaction` (from `io.quarkus.transaction`) is a Quarkus‑specific alternative to `@Transactional` that provides additional configuration options, such as:
+
+- `timeout` (in seconds) – similar to Jakarta's `timeout`.
+- `rollbackOn` / `dontRollbackOn` – similar but uses `Class<? extends Throwable>[]`.
+- **`@QuarkusTransaction.Begin`** – can be used to manually begin a transaction on a method.
+
+It is functionally similar to `@Transactional` but offers some Quarkus‑specific extensions. In practice, most developers use the standard Jakarta `@Transactional`.
+
+---
+
+### 18. How do you test transactional logic in Quarkus?
+
+**Answer:**  
+In `@QuarkusTest`, you can use `@Transactional` on test methods or test classes to ensure that operations run in a transaction. However, be careful – by default, test transactions **commit** (they do not roll back automatically). To roll back after each test, you can:
+
+- Use `@TestTransaction` (from Quarkus) which automatically rolls back the transaction after the test.
+- Or manually use `@Transactional` and then `TransactionManager.setRollbackOnly()`.
+
+```java
+@QuarkusTest
+public class UserServiceTest {
+    @Inject
+    UserService service;
+
+    @Test
+    @TestTransaction // rolls back automatically
+    public void testCreateUser() {
+        service.createUser("test");
+        assertEquals(1, User.count());
+    }
+}
+```
+
+For reactive tests, you use `withTransaction()` inside the test and `.await()` the result.
+
+---
+
+### 19. Can you use `@Transactional` with `Multi` return types in REST endpoints?
+
+**Answer:**  
+No. `@Transactional` is a **blocking** construct. If your REST endpoint returns `Multi` (reactive), it runs on the event loop. Applying `@Transactional` on such a method will have no effect (it's ignored) because Quarkus detects it cannot be woven into a non‑blocking pipeline.
+
+For `Multi` endpoints, you must manage transactions programmatically inside the reactive pipeline, ensuring the transaction is wrapped around the entire stream emission, not per‑item.
+
+---
+
+### 20. What are the common pitfalls with transactions in Quarkus?
+
+**Answer:**
+
+- **Self‑invocation** – Calling a `@Transactional` method from within the same class bypasses the interceptor.
+- **Threading assumptions** – `@Transactional` relies on thread‑local state. In reactive code, threads switch, so transactions cannot be propagated – use reactive transactions instead.
+- **Checked exceptions** – By default, they do not trigger a rollback. Always configure `rollbackOn` if needed.
+- **Long transactions** – Holding a transaction open for too long can cause connection exhaustion and deadlocks. Keep transaction boundaries narrow.
+- **Nested transactions** – Jakarta EE does not support savepoints or nested transactions. `REQUIRES_NEW` creates a separate, independent transaction, not a nested one.
+- **Missing `@Transactional` on service methods** – If you call `repository.persist()` without a transaction, Hibernate will still flush but in auto‑commit mode (each operation is its own transaction), which can lead to partial updates and inconsistent state.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Aspect | Imperative (Blocking) | Reactive (Non‑blocking) |
+| :--- | :--- | :--- |
+| **Annotation** | `@Transactional` (jakarta.transaction) | Not applicable |
+| **Programmatic API** | `UserTransaction` (rarely used) | `Panache.withTransaction()` / `Session.withTransaction()` |
+| **Transaction Manager** | Narayana (JTA) | Hibernate Reactive's own session transaction |
+| **Threading** | Same thread (worker pool) | May switch threads – state is not thread‑local |
+| **Rollback on exception** | Unchecked by default | Any failure in the `Uni` pipeline |
+| **Timeout** | `@Transactional(timeout = x)` | Timeout on the `Uni` (`ifNoItem().after()`) |

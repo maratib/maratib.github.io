@@ -1,0 +1,132 @@
+---
+title: SmallRye Reactive Messaging (Kafka/AMQP)
+description: Guides on Quarkus messaging including Kafka, AMQP, reactive messaging, and event-driven patterns.
+sidebar:
+  order: 1
+  label: Reactive Messaging
+---
+- Producing and consuming messages reactively using `@Incoming` and `@Outgoing` with `Multi/Uni`
+
+### 1. What is SmallRye Reactive Messaging and why is it important in Quarkus?
+
+**Answer:** SmallRye Reactive Messaging is a framework for building **event-driven** and **data streaming** applications. It's an implementation of the Eclipse MicroProfile Reactive Messaging specification. In Quarkus, it enables your application to interact with various messaging technologies like **Apache Kafka, AMQP, or MQTT** in a non-blocking, reactive way. It builds on **Reactive Streams**, meaning the flow of messages is controlled by the consumer (back-pressure), making it highly scalable.
+
+---
+
+### 2. What are the core concepts of SmallRye Reactive Messaging?
+
+**Answer:** The three main pillars are **Messages, Channels, and Connectors**:
+*   **Messages**: The data envelope flowing through the system.
+*   **Channels**: The logical pathways (`@Incoming` and `@Outgoing`) that connect components.
+*   **Connectors**: Adapters that interface with external brokers like Kafka.
+
+---
+
+### 3. How does Quarkus simplify the use of Reactive Messaging?
+
+**Answer:** Quarkus uses a **declarative approach** with CDI annotations. You just annotate methods with `@Incoming` and/or `@Outgoing`. Quarkus handles the complex task of connecting these methods to channels, managing back-pressure, and integrating with connectors.
+
+---
+
+### 4. What is the new `quarkus-messaging` artifact ID?
+
+**Answer:** The `quarkus-smallrye-reactive-messaging` and `quarkus-smallrye-reactive-messaging-kafka` artifact IDs are being **renamed** to `quarkus-messaging` and `quarkus-messaging-kafka`. The newer versions use these IDs, though the old ones still work.
+
+---
+
+### 5. What are the differences between `@Incoming`, `@Outgoing`, and `Emitter`?
+
+**Answer:**
+*   **`@Incoming`**: Marks a method that **consumes** messages from a channel. The framework calls the method when a message arrives.
+*   **`@Outgoing`**: Marks a method that **produces** messages to a channel. The return value of the method becomes the outgoing message.
+*   **`Emitter`**: Used to **programmatically send** messages, typically from REST endpoints or other business logic. You inject it with `@Channel` and call `emitter.send(payload)`.
+
+---
+
+### 6. How do you send messages from a REST endpoint using Reactive Messaging?
+
+**Answer:** You inject an `Emitter` for your desired channel and call its `send` method:
+```java
+@Path("/prices")
+public class PriceResource {
+    @Inject @Channel("price-out") Emitter<Double> priceEmitter;
+    @POST
+    public Uni<Void> addPrice(Double price) { return Uni.createFrom().completionStage(priceEmitter.send(price)); }
+}
+```
+The `send` method returns a `CompletionStage`, which is integrated with Mutiny.
+
+---
+
+### 7. How can you test messaging logic without a real broker?
+
+**Answer:** Use the **In-Memory Connector**. It replaces the real connector for testing, allowing you to verify messages sent to a channel or send messages to an `@Incoming` method:
+```java
+@QuarkusTest
+public class PriceTest {
+    @BeforeEach void setup() { InMemoryConnector.clear(); } // Reset state
+    @Test void testPriceProcessor() {
+        InMemoryConnector.clean(); // Clean before test if needed
+        InMemorySource<Double> prices = InMemoryConnector.source("prices-in");
+        prices.send(10.0); // Send test message to incoming channel
+        // Assert on the outgoing channel 'prices-out'
+        List<Double> results = InMemoryConnector.sink("prices-out").getReceived();
+        assertEquals(1, results.size());
+    }
+}
+```
+**⚠️ Caution:** `InMemoryConnector` state is global. Use `@BeforeEach` to call `InMemoryConnector.clear()` to avoid cross-test contamination.
+
+---
+
+### 8. What is back-pressure and how is it managed?
+
+**Answer:** Back-pressure ensures a fast producer doesn't overwhelm a slow consumer. SmallRye Reactive Messaging uses the Reactive Streams protocol, where the consumer signals how many messages it can handle.
+
+---
+
+### 9. How do you configure back-pressure for an `Emitter`?
+
+**Answer:** The `@OnOverflow` annotation configures the policy when downstream can't keep up. Common strategies:
+*   **`BUFFER`**: Buffers messages until consumed (default, buffer size defaults to **128** if not set). Can be configured: `@OnOverflow(value = OnOverflow.Strategy.BUFFER, bufferSize = 1000)`.
+*   **`DROP`**: Drops the newest message if the downstream can't keep up.
+*   **`FAIL`**: Throws an exception if the buffer is full.
+*   **`NONE`**: No strategy; downstream must handle overflow.
+
+---
+
+### 10. What is the default retry behavior for Kafka connector errors?
+
+**Answer:** The SmallRye Reactive Messaging Kafka connector defaults to **automatic resilience through retries** when the Kafka broker is unreachable. The connector attempts to reconnect and retry sending messages automatically.
+
+---
+
+### 11. How do you manually handle a message failure to trigger a retry?
+
+**Answer:** If your `@Incoming` method throws an exception, the message is **nacked** (negatively acknowledged). The connector may retry based on its configuration, leading to message redelivery.
+
+---
+
+### 12. What is the `@Acknowledgment` annotation used for?
+
+**Answer:** It controls **when** a message is acknowledged:
+```java
+@Incoming("in")
+@Acknowledgment(Acknowledgment.Strategy.POST_PROCESSING)
+public Uni<Void> process(Message<String> msg) { ... }
+```
+**Strategies**:
+*   **`MANUAL`**: You must manually acknowledge by calling `msg.ack()`.
+*   **`POST_PROCESSING`**: Acknowledged after the method completes (default).
+*   **`PRE_PROCESSING`**: Acknowledged before the method is called (use with caution).
+
+---
+
+### 13. What are the common pitfalls when using Reactive Messaging?
+
+**Answer:**
+*   **Using `@InjectMock` on `Emitter`**: You cannot directly mock an `Emitter`. Instead, test with the **In-Memory Connector**.
+*   **`InMemoryConnector` State**: The in-memory connector is global across tests; always call `InMemoryConnector.clear()` in `@BeforeEach`.
+*   **Not Handling Back-Pressure**: Infinite growth can cause memory issues.
+*   **Blocking in `@Incoming`**: Long-running operations block the message processing thread. Offload to a separate thread with `@Blocking`.
+*   **Assuming All Exceptions Retry**: Not all exceptions retry; if you throw a non-retryable exception, the message may be sent to a Dead Letter Queue (DLQ) or lost.

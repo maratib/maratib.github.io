@@ -1,0 +1,134 @@
+---
+title: Context Propagation in Reactive Streams 
+description: Guides on Quarkus internals including CDI, ArC, build-time processing, and extension development.
+sidebar:
+  order: 3
+  label: Context Propagation
+---
+
+- Managing `@RequestScoped` and MDC logging contexts across Vert.x event loops (critical for debugging)
+
+
+### The Problem: Thread-Locals in an Asynchronous World
+
+In traditional blocking code, contextual objects like security identities, transaction states, or logging MDC are stored in `ThreadLocal` variables. Any code running on that thread can access them without passing them as parameters everywhere.
+
+However, in reactive/async code, work is split into pipelines of code blocks that execute "later". These blocks often run on different threads, long after the original method has returned. Consequently, `ThreadLocal` variables and `try/finally` blocks stop working, as the contextual values are lost.
+
+---
+
+### The Solution: SmallRye Context Propagation
+
+Quarkus solves this with **SmallRye Context Propagation**, an implementation of the **MicroProfile Context Propagation** specification.
+
+It works by **capturing** contextual values (that used to be in thread-locals) at one point and **restoring** them when your reactive code is executed later.
+
+**Key mechanism**: Quarkus stores the request scope in the **Vert.x duplicated context**, which is used throughout the entire reactive/async processing pipeline. When a reactive operation moves across threads, this duplicated context is carried along, ensuring continuity.
+
+---
+
+### How to Enable It (Quarkus 3.9+)
+
+If you are using **Mutiny** (the `quarkus-mutiny` extension), enabling context propagation is straightforward.
+
+Add the following extension:
+
+```bash
+quarkus ext add io.quarkus:quarkus-smallrye-context-propagation
+```
+
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-smallrye-context-propagation</artifactId>
+</dependency>
+```
+
+With this, you automatically get context propagation for **ArC (CDI)**, **Quarkus REST (RESTEasy Reactive)**, and **transactions**.
+
+---
+
+### What Contexts Are Propagated?
+
+*   **CDI Contexts** (`@RequestScoped`, `@SessionScoped`, etc.)
+*   **Security Identity** (`SecurityIdentity`)
+*   **Transaction Context** (for `@Transactional`)
+*   **OpenTelemetry Tracing Context**
+*   **Logging MDC**
+
+---
+
+### Usage Example with Mutiny
+
+Let's say you have a REST endpoint that reads from Kafka, stores in a database using Hibernate Reactive with Panache, all in one transaction:
+
+```java
+@Inject @Channel("prices") Publisher<Double> prices;
+
+@GET
+@Transactional
+public Uni<List<Price>> getPrices() {
+    return Multi.createFrom().publisher(prices)
+        .select().first(3)
+        .onItem().transform(price -> {
+            Price p = new Price();
+            p.value = price;
+            return p;
+        })
+        .onItem().call(price -> price.persist())
+        .collect().asList();
+}
+```
+
+With `quarkus-smallrye-context-propagation` added, the CDI request context and transaction are automatically propagated across all these reactive stages.
+
+---
+
+### Context Propagation in Reactive Messaging
+
+When a message arrives via `@Incoming`, the context from the producer is **incidentally propagated** to the consumer. This means the consumer may use the same request scope, which is destroyed when the original REST request ends.
+
+If you need the consumer to start its own request context, you may need to clear the propagated context using `@ContextPropagation(clear = true)` or similar configuration.
+
+---
+
+### Best Practices
+
+1.  **Add the extension**: Always add `quarkus-smallrye-context-propagation` when using reactive code with Mutiny.
+2.  **Avoid manual `ThreadLocal`**: Do not roll your own thread-local propagation; it's error-prone.
+3.  **Be aware of infinite streams**: Mutiny may reuse the same context endlessly for infinite `Multi` streams. Explicitly manage context if needed.
+4.  **Test context propagation**: Use `@QuarkusTest` and verify that `SecurityIdentity` or request-scoped beans are available in reactive pipelines.
+
+---
+
+### Common Pitfalls
+
+| Pitfall | Consequence | Solution |
+| :--- | :--- | :--- |
+| **Missing extension** | Contexts (CDI, security, transactions) lost in reactive code | Add `quarkus-smallrye-context-propagation` |
+| **Using `CompletableFuture`** | OpenTelemetry context not propagated to new threads | Use Mutiny or Vert.x contexts instead |
+| **Parallel streams** | ForkJoinPool threads are not managed by Quarkus | Avoid `parallelStream()` in reactive code |
+| **Coroutines** | Vert.x context not properly propagated | Use Quarkus's Kotlin coroutine support |
+| **Context pollution** | Consumer inherits request scope that gets destroyed | Use `@ContextPropagation(clear = ...)` |
+
+---
+
+### Future: Jakarta Concurrency
+
+MicroProfile Context Propagation is **discontinued**. Its replacement is **Jakarta Concurrency**. Quarkus currently still uses MP Context Propagation but is expected to migrate to Jakarta Concurrency in future versions.
+
+---
+
+### Summary Table
+
+| Concept | Key Points |
+| :--- | :--- |
+| **Problem** | `ThreadLocal` values lost when reactive code switches threads |
+| **Solution** | SmallRye Context Propagation (MicroProfile Context Propagation) |
+| **Mechanism** | Captures and restores contextual values (Vert.x duplicated context) |
+| **Extension** | `quarkus-smallrye-context-propagation` |
+| **Propagated contexts** | CDI scopes, SecurityIdentity, transactions, tracing, MDC |
+| **With Mutiny** | Just add the extension; propagation is automatic |
+| **Pitfalls** | Missing extension, `CompletableFuture`, parallel streams, coroutines |
+| **Future** | Migration to Jakarta Concurrency |

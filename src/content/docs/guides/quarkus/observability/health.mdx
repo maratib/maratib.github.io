@@ -1,0 +1,403 @@
+---
+title: Health Checks
+description: Guides on Quarkus observability including metrics, tracing, health checks, and logging.
+sidebar:
+  order: 1
+  label: Health Checks
+---
+- Implementing readiness and liveness probes using `@Health` and `@Readiness` for Kubernetes deployments.
+
+### 1. What are health checks and why are they important for microservices?
+
+**Answer:**  
+Health checks are endpoints that report the **status** of a service to external monitoring tools, orchestration platforms (like Kubernetes), and load balancers. They are essential for:
+
+- **Liveness** – Indicates whether the application is still running (e.g., not deadlocked or crashed). Kubernetes uses liveness probes to restart unhealthy containers.
+- **Readiness** – Indicates whether the application is ready to accept traffic (e.g., database connections established, caches warmed up). Kubernetes uses readiness probes to stop sending traffic to a pod that isn't ready.
+- **Startup** – Indicates whether the application has finished initializing. Used for applications with slow startup (common with JVM mode) to delay liveness/readiness probes until startup is complete.
+
+Quarkus implements these via the **SmallRye Health** extension, which follows the MicroProfile Health specification.
+
+---
+
+### 2. How do you add health checks to a Quarkus project?
+
+**Answer:**  
+Add the `quarkus-smallrye-health` extension:
+
+```bash
+quarkus ext add smallrye-health
+```
+
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-smallrye-health</artifactId>
+</dependency>
+```
+
+Once added, Quarkus automatically exposes health endpoints:
+
+| Endpoint | Purpose |
+| :--- | :--- |
+| `/q/health` | Aggregated health status of all checks |
+| `/q/health/live` | Liveness checks only |
+| `/q/health/ready` | Readiness checks only |
+| `/q/health/started` | Startup checks (available in Quarkus 3.9+ with extension update) |
+
+All endpoints return a JSON response with `status: "UP"` or `"DOWN"` and detailed health data.
+
+---
+
+### 3. What are the three types of health checks in MicroProfile Health?
+
+**Answer:**  
+MicroProfile Health defines three types:
+
+1. **Liveness** – Checks if the application is **alive** (not crashed or deadlocked). Used by Kubernetes liveness probes.
+2. **Readiness** – Checks if the application is **ready to serve traffic** (e.g., dependencies are available). Used by Kubernetes readiness probes.
+3. **Startup** – Checks if the application has **completed startup** (available in MicroProfile Health 3.0+). Used by Kubernetes startup probes to avoid premature failures during slow startup.
+
+In Quarkus 3.9+, `quarkus-smallrye-health` supports all three.
+
+---
+
+### 4. How do you implement a custom health check in Quarkus?
+
+**Answer:**  
+Create a CDI bean that implements `HealthCheck` and annotate it with `@Health`:
+
+**Liveness check:**
+```java
+@Health
+@ApplicationScoped
+public class DatabaseLivenessCheck implements HealthCheck {
+    @Override
+    public HealthCheckResponse call() {
+        try {
+            // Check database connectivity
+            return HealthCheckResponse.up("database");
+        } catch (Exception e) {
+            return HealthCheckResponse.down("database", "Connection failed");
+        }
+    }
+}
+```
+
+**Readiness check:**
+```java
+@Readiness
+@ApplicationScoped
+public class CacheReadyCheck implements HealthCheck {
+    @Override
+    public HealthCheckResponse call() {
+        if (cacheService.isReady()) {
+            return HealthCheckResponse.up("cache");
+        }
+        return HealthCheckResponse.down("cache");
+    }
+}
+```
+
+Use `@Startup` annotation for startup checks.
+
+---
+
+### 5. What is the difference between `@Health`, `@Readiness`, and `@Startup` annotations?
+
+**Answer:**
+
+| Annotation | Check Type | Endpoint | When it fails |
+| :--- | :--- | :--- | :--- |
+| `@Health` | Liveness | `/q/health/live` | Application should be restarted. |
+| `@Readiness` | Readiness | `/q/health/ready` | Application should not receive traffic. |
+| `@Startup` | Startup | `/q/health/started` | Application is still initializing. |
+
+All checks annotated with `@Health` (without a specific type) are considered liveness checks. The aggregated endpoint `/q/health` reports the status of all checks combined.
+
+---
+
+### 6. How does Quarkus integrate health checks with Kubernetes?
+
+**Answer:**  
+Quarkus can automatically generate Kubernetes manifests (Deployment, Service) with the correct probes configured, using the `quarkus-kubernetes` extension.
+
+```properties
+quarkus.kubernetes.liveness-probe.http-action-path=/q/health/live
+quarkus.kubernetes.readiness-probe.http-action-path=/q/health/ready
+quarkus.kubernetes.startup-probe.http-action-path=/q/health/started
+```
+
+When you build the application (`./mvnw package -Pnative`), Quarkus generates a `kubernetes.yml` with these probes set. This eliminates manual configuration.
+
+---
+
+### 7. How do you customize the health check response (e.g., add data, change status codes)?
+
+**Answer:**  
+You can build a custom `HealthCheckResponse` with additional data:
+
+```java
+return HealthCheckResponse.named("database")
+    .withData("host", "localhost")
+    .withData("port", 5432)
+    .status(HealthCheckResponse.Status.UP)
+    .build();
+```
+
+To change the HTTP status code of the health endpoints, use `quarkus.smallrye-health.root-path` and/or custom `@Path` on your health resources (if you implement them with JAX‑RS, but that's not recommended). The default status codes are:
+- `200 OK` if all checks are UP.
+- `503 Service Unavailable` if any check is DOWN.
+
+---
+
+### 8. How do you disable individual health checks based on environment (e.g., dev vs prod)?
+
+**Answer:**  
+Use `@Health` with `@ConfigProperty` or profile‑specific configuration:
+
+**Approach 1 – Conditional CDI beans:**
+```java
+@Health
+@ApplicationScoped
+@Produces
+@IfBuildProfile("prod") // Only available in prod profile
+public HealthCheck databaseCheck() {
+    return new DatabaseHealthCheck();
+}
+```
+
+**Approach 2 – Using `quarkus.smallrye-health.health-checks` property:**
+```properties
+%dev.quarkus.smallrye-health.health-checks=com.example.DevHealthCheck
+%prod.quarkus.smallrye-health.health-checks=com.example.ProdHealthCheck
+```
+
+---
+
+### 9. How do you test health checks in a Quarkus integration test?
+
+**Answer:**  
+Use `@QuarkusTest` and RestAssured:
+
+```java
+@QuarkusTest
+public class HealthCheckTest {
+    @Test
+    public void testLiveness() {
+        given().when().get("/q/health/live")
+               .then().statusCode(200)
+               .body("status", equalTo("UP"));
+    }
+
+    @Test
+    public void testReadiness() {
+        given().when().get("/q/health/ready")
+               .then().statusCode(200)
+               .body("checks[0].name", equalTo("database"));
+    }
+}
+```
+
+You can also mock health check outcomes using `@InjectMock` on the health check bean.
+
+---
+
+### 10. Can you write reactive health checks that return `Uni`/`Multi`?
+
+**Answer:**  
+Yes. Since Quarkus 3.0, health checks can be implemented using the `ReactiveHealthCheck` interface (from SmallRye Health):
+
+```java
+@Health
+@ApplicationScoped
+public class ReactiveDatabaseCheck implements ReactiveHealthCheck {
+    @Inject
+    DatabaseService service;
+
+    @Override
+    public Uni<HealthCheckResponse> call() {
+        return service.ping()
+            .map(response -> HealthCheckResponse.up("database"))
+            .onFailure().recoverWithItem(HealthCheckResponse.down("database"));
+    }
+}
+```
+
+The health endpoint can handle reactive checks without blocking the event loop.
+
+---
+
+### 11. What is the purpose of the aggregated `/q/health` endpoint?
+
+**Answer:**  
+`/q/health` returns a combined status of **all** health checks (liveness, readiness, and startup). It is useful for monitoring dashboards or simple health monitoring where you only care about the overall health. However, for Kubernetes, it's recommended to use the specific endpoints (`/live`, `/ready`, `/started`) to match the probe semantics.
+
+---
+
+### 12. How do you set a global timeout for health checks?
+
+**Answer:**  
+Configure in `application.properties`:
+
+```properties
+# Timeout in seconds
+quarkus.smallrye-health.timeout=10
+```
+
+If a health check exceeds this timeout, it is considered DOWN. This is crucial to avoid hanging health probes that could cause Kubernetes to think the pod is unhealthy.
+
+---
+
+### 13. How do you implement a health check that depends on an external service (e.g., a REST API)?
+
+**Answer:**  
+Use the REST Client (reactive or blocking) inside the health check:
+
+**Blocking:**
+```java
+@Health
+@ApplicationScoped
+public class ExternalApiCheck implements HealthCheck {
+    @Inject
+    @RestClient
+    ExternalApiClient client;
+
+    @Override
+    public HealthCheckResponse call() {
+        try {
+            client.ping(); // blocking call
+            return HealthCheckResponse.up("external-api");
+        } catch (Exception e) {
+            return HealthCheckResponse.down("external-api", e.getMessage());
+        }
+    }
+}
+```
+
+**Reactive:**
+```java
+@Health
+@ApplicationScoped
+public class ReactiveExternalCheck implements ReactiveHealthCheck {
+    @Inject
+    @RestClient
+    ReactiveExternalClient client;
+
+    @Override
+    public Uni<HealthCheckResponse> call() {
+        return client.ping()
+            .map(res -> HealthCheckResponse.up("external-api"))
+            .onFailure().recoverWithItem(HealthCheckResponse.down("external-api"));
+    }
+}
+```
+
+---
+
+### 14. How does Quarkus handle health checks in native mode?
+
+**Answer:**  
+Health checks work seamlessly in native mode. Quarkus processes all health check classes at build time, and the bytecode is included in the native executable. No reflection is needed for basic health checks, but if you use reflection-heavy libraries, ensure they are registered for reflection.
+
+---
+
+### 15. What is the difference between MicroProfile Health 1.0 and 2.0/3.0?
+
+**Answer:**
+
+| Feature | MP Health 1.0 | MP Health 2.0/3.0 |
+| :--- | :--- | :--- |
+| **Check types** | Only aggregated | Liveness, Readiness, Startup |
+| **Annotations** | `@Health` | `@Health`, `@Readiness`, `@Startup` |
+| **Endpoints** | `/health` | `/health`, `/health/live`, `/health/ready`, `/health/started` |
+| **Reactive support** | No | Yes (MP Health 3.0) |
+
+Quarkus 3.9+ implements MP Health 3.0.
+
+---
+
+### 16. How do you implement a health check that uses the database without blocking?
+
+**Answer:**  
+Use reactive Panache or Hibernate Reactive:
+
+```java
+@Health
+@ApplicationScoped
+public class ReactiveDbHealthCheck implements ReactiveHealthCheck {
+    @Override
+    public Uni<HealthCheckResponse> call() {
+        return Panache.getSession()
+            .chain(session -> session.createNativeQuery("SELECT 1").getSingleResult())
+            .map(result -> HealthCheckResponse.up("database"))
+            .onFailure().recoverWithItem(HealthCheckResponse.down("database"));
+    }
+}
+```
+
+This check runs on the event loop and does not block.
+
+---
+
+### 17. Can health checks be used to perform service discovery registration?
+
+**Answer:**  
+Not directly. Health checks report the service's state. Service discovery registries (like Consul or Kubernetes) typically poll health endpoints to decide whether to route traffic. They do not register/unregister automatically based on health; they simply reflect the current state.
+
+---
+
+### 18. How do you include custom information in the health check response (e.g., version, build info)?
+
+**Answer:**  
+Use `withData` on `HealthCheckResponse.Builder`:
+
+```java
+return HealthCheckResponse.named("app-info")
+    .withData("version", "1.2.3")
+    .withData("commit", "abc123")
+    .withData("environment", System.getenv("ENV"))
+    .up()
+    .build();
+```
+
+You can also provide a `@Health` check that always returns `UP` with static info.
+
+---
+
+### 19. How do you disable health endpoints in a specific environment (e.g., development)?
+
+**Answer:**  
+You can disable the health endpoints globally by not adding the extension, or you can secure them with a security annotation and skip authentication for certain profiles.
+
+**Alternative:** Configure the root path to something obscure or use a firewall. However, in microservices, health endpoints are typically public (or at least unauthenticated) for Kubernetes to access.
+
+---
+
+### 20. What are the common pitfalls with health checks in Quarkus?
+
+**Answer:**
+
+- **Too many checks** – Each health check adds overhead. Keep checks lightweight.
+- **Blocking checks** – If you mix blocking checks with reactive endpoints, ensure they run on a worker thread (use `@Blocking` on the health check or use `ReactiveHealthCheck`).
+- **Timeouts** – Health checks can time out if the external service is slow. Set a reasonable timeout (`quarkus.smallrye-health.timeout`).
+- **Cascading failures** – A failing dependency should mark readiness DOWN, not liveness (unless the dependency is critical and restarting the app is the only remedy).
+- **Database connections** – Avoid opening a new database connection per health check; reuse existing connections.
+- **Production vs. development** – Some checks (like external API ping) may be inappropriate in development. Use profile‑specific checks.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Details |
+| :--- | :--- |
+| **Extension** | `quarkus-smallrye-health` |
+| **Endpoints** | `/q/health`, `/q/health/live`, `/q/health/ready`, `/q/health/started` |
+| **Annotations** | `@Health` (liveness), `@Readiness`, `@Startup` |
+| **Interface** | `HealthCheck` (blocking), `ReactiveHealthCheck` (non‑blocking) |
+| **Kubernetes integration** | Auto‑generates probes via `quarkus-kubernetes` |
+| **Timeout** | `quarkus.smallrye-health.timeout` |
+| **Custom data** | `HealthCheckResponse.withData()` |
+| **Testing** | RestAssured on `/q/health/*` endpoints |
+

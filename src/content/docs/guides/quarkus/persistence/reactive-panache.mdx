@@ -1,0 +1,415 @@
+---
+title: Reactive Panache
+description: Reactive Panache on Quarkus.
+sidebar:
+  order: 10
+  label: Reactive Panache
+---
+
+## Reactive Data Access (Hibernate Reactive with Panache)  
+Using `Uni/Multi` with the database, and the crucial difference between `list()` and `stream()` in reactive contexts
+
+---
+
+
+### 1. What is Hibernate Reactive and how does it differ from Hibernate ORM?
+
+**Answer:**  
+**Hibernate Reactive** is a non‑blocking, reactive implementation of Hibernate ORM. It uses the same mapping metadata (annotations, JPA) but performs all database interactions **asynchronously** using a non‑blocking database driver and Vert.x's event loop.
+
+**Key differences:**
+
+| Aspect | Hibernate ORM | Hibernate Reactive |
+| :--- | :--- | :--- |
+| **Threading** | Blocking – holds a worker thread for the entire operation | Non‑blocking – uses event‑loop threads (Vert.x) |
+| **Transaction API** | `@Transactional` (declarative) | `withTransaction()` (programmatic) |
+| **Return types** | `List<T>`, `T`, `void` | `Uni<T>`, `Multi<T>` |
+| **JDBC vs. Reactive Driver** | JDBC drivers (blocking) | Reactive drivers (e.g., `quarkus-reactive-pg-client`) |
+| **Scalability** | Limited by thread pool size | Scales with fewer threads (handles many concurrent connections) |
+
+---
+
+### 2. How do you add Hibernate Reactive with Panache to a Quarkus project?
+
+**Answer:**  
+Add the following extension:
+
+```bash
+quarkus ext add hibernate-reactive-panache
+```
+
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-hibernate-reactive-panache</artifactId>
+</dependency>
+```
+
+You also need a reactive database driver, e.g., for PostgreSQL:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-reactive-pg-client</artifactId>
+</dependency>
+```
+
+Configure the datasource in `application.properties`:
+```properties
+quarkus.datasource.db-kind=postgresql
+quarkus.datasource.reactive.url=postgresql://localhost:5432/mydb
+quarkus.datasource.username=user
+quarkus.datasource.password=pass
+quarkus.hibernate-orm.database.generation=update
+```
+
+---
+
+### 3. How do you define a reactive Panache entity?
+
+**Answer:**  
+The entity definition is identical to blocking Panache – you extend `PanacheEntity` (or `PanacheEntityBase`). The difference is in the **usage** (methods return `Uni`/`Multi`).
+
+```java
+import jakarta.persistence.Entity;
+import io.quarkus.hibernate.reactive.panache.PanacheEntity;
+
+@Entity
+public class User extends PanacheEntity {
+    public String name;
+    public String email;
+}
+```
+
+Notice the import is from `io.quarkus.hibernate.reactive.panache`, not `hibernate.orm.panache`.
+
+---
+
+### 4. What return types do reactive Panache methods use?
+
+**Answer:**
+
+- **Single results** (e.g., `findById`, `persist`, `delete`) return `Uni<T>` or `Uni<Void>`.
+- **Multiple results** (e.g., `listAll`, `find(...).list()`) return `Uni<List<T>>`.
+- **Streaming results** (e.g., `streamAll`, `find(...).stream()`) return `Multi<T>` – each entity is emitted as it's fetched.
+
+Examples:
+```java
+Uni<User> user = User.findById(1L);
+Uni<List<User>> users = User.listAll();
+Multi<User> userStream = User.streamAll();
+```
+
+---
+
+### 5. How do you perform CRUD operations reactively?
+
+**Answer:**  
+All methods are asynchronous and must be chained or subscribed.
+
+**Create/Persist:**
+```java
+Uni<Void> persistOp = new User().persist();
+// or with a transaction
+Uni<User> savedUser = userRepository.persist(user);
+```
+
+**Read:**
+```java
+Uni<User> user = User.findById(id);
+Uni<List<User>> all = User.listAll();
+Uni<Long> count = User.count();
+```
+
+**Update:**  
+Modify the entity and call `persist()` again:
+```java
+user
+    .onItem().transform(u -> { u.name = "New Name"; return u; })
+    .onItem().transformToUni(u -> u.persist());
+```
+
+**Delete:**
+```java
+Uni<Boolean> deleted = User.deleteById(id);
+Uni<Long> deletedCount = User.delete("name", "John");
+```
+
+---
+
+### 6. How do you handle transactions in reactive Panache?
+
+**Answer:**  
+You **cannot** use `@Transactional` with reactive Panache – that annotation is for blocking JDBC transactions. Instead, you use **programmatic reactive transactions** with `Panache.getSession()` and `.withTransaction()`.
+
+```java
+@ApplicationScoped
+public class UserService {
+    public Uni<User> createUser(String name, String email) {
+        return Panache.withTransaction(() -> {
+            User user = new User();
+            user.name = name;
+            user.email = email;
+            return user.persist().replaceWith(user);
+        });
+    }
+}
+```
+
+Alternatively, using the session directly:
+```java
+return Panache.getSession()
+    .call(session -> session.persist(user))
+    .chain(() -> Panache.getSession())
+    .chain(session -> session.flush());
+```
+
+**Important:** The `withTransaction` block must return a `Uni`. If the Uni fails, the transaction rolls back automatically.
+
+---
+
+### 7. What is the difference between `list()` and `stream()` in reactive Panache?
+
+**Answer:**
+
+- **`list()`** – returns `Uni<List<T>>`. All results are collected into a single `List` in memory. This is fine for small to medium result sets.
+- **`stream()`** – returns `Multi<T>`. The database cursor is streamed, and entities are emitted one by one as they arrive. This allows **backpressure** and is ideal for very large datasets where you don't want to load everything into memory at once.
+
+```java
+// Blocks until all are collected
+Uni<List<User>> users = User.listAll();
+
+// Streams lazily – entities arrive over time
+Multi<User> users = User.streamAll();
+users.subscribe().with(user -> process(user));
+```
+
+---
+
+### 8. Can you mix blocking and reactive code in the same endpoint? How?
+
+**Answer:**  
+Yes, but you must be careful about thread management.
+
+- If your REST endpoint returns a `Uni`/`Multi`, it runs on the **event loop** (non‑blocking).
+- If you need to call a blocking operation (e.g., JDBC, `Thread.sleep`, or a blocking SDK), you must move it to a **worker thread** using `@Blocking` on the method or using `Uni.runSubscriptionOn(Infrastructure.getDefaultWorkerPool())`.
+
+```java
+@GET
+@Blocking  // now runs on worker thread
+public List<User> getAllBlocking() {
+    return User.listAll(); // .await().indefinitely() is not allowed in reactive, so keep it blocking
+}
+```
+
+Or, inside a reactive pipeline:
+```java
+public Uni<String> process() {
+    return Uni.createFrom().item(() -> blockingCall())
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+}
+```
+
+---
+
+### 9. How do you write custom queries with reactive Panache?
+
+**Answer:**  
+The `find()` method works just like blocking Panache but returns a `PanacheQuery` whose terminal operations are reactive.
+
+**JPQL:**
+```java
+Uni<List<User>> users = User.find("name = ?1", "John").list();
+Multi<User> userStream = User.find("age > ?1", 18).stream();
+Uni<User> first = User.find("email LIKE ?1", "%@gmail.com").firstResult();
+```
+
+**Named parameters:**
+```java
+Uni<List<User>> users = User.find("name = :name", Parameters.with("name", "John")).list();
+```
+
+**Native query (with `@NamedQuery` or `@Query` – Hibernate Reactive supports native queries):**
+```java
+Uni<List<User>> users = User.find("SELECT * FROM users WHERE age > ?1", 18).list();
+```
+
+---
+
+### 10. How do you perform joins and fetch relationships reactively?
+
+**Answer:**  
+Use JPA annotations (`@ManyToOne`, `@OneToMany`) as usual. However, lazy loading works differently – in Hibernate Reactive, you must explicitly fetch associations within the query or session.
+
+**Eager fetch in query:**
+```java
+Uni<User> user = User.find("SELECT u FROM User u LEFT JOIN FETCH u.orders WHERE u.id = ?1", id)
+                     .firstResult();
+```
+
+Or using the session:
+```java
+return Panache.getSession()
+    .chain(session -> session.find(User.class, id))
+    .chain(user -> Uni.createFrom().item(user.orders)); // may trigger lazy fetch if session is still open
+```
+
+**⚠️ Caution:** Accessing lazy associations outside the session will fail. Keep the session active throughout the reactive chain.
+
+---
+
+### 11. How does reactive Panache handle connection pooling?
+
+**Answer:**  
+Under the hood, Hibernate Reactive uses the **Vert.x Reactive PostgreSQL/MySQL client**, which has its own connection pooling. Quarkus configures this pool via `application.properties`:
+
+```properties
+quarkus.datasource.reactive.max-size=20
+quarkus.datasource.reactive.idle-timeout=60S
+quarkus.datasource.reactive.connection-timeout=10S
+```
+
+These pools are non‑blocking and manage connections efficiently for the event‑loop model.
+
+---
+
+### 12. What is the role of `Panache.getSession()` in reactive Panache?
+
+**Answer:**  
+`Panache.getSession()` returns `Uni<Session>` (the Hibernate Reactive Session). It gives you low‑level access to the Session for advanced operations that are not covered by Panache's convenience methods.
+
+```java
+public Uni<User> customOperation(Long id) {
+    return Panache.getSession()
+        .chain(session -> session.find(User.class, id))
+        .chain(user -> {
+            // complex logic
+            return Panache.getSession()
+                .chain(s -> s.persist(user))
+                .replaceWith(user);
+        });
+}
+```
+
+The session is scoped to the current reactive context (usually the request).
+
+---
+
+### 13. Can you use `@Blocking` with reactive Panache? What happens?
+
+**Answer:**  
+Yes, you can annotate a method with `@Blocking` to tell Quarkus to run it on a worker thread instead of the event loop. Inside that method, you can use **blocking** Panache methods (like `list()`) because they will `await()` the result.
+
+However, if you're using **reactive** Panache and call `.await().indefinitely()` on a worker thread, it works but defeats the purpose of non‑blocking I/O. The preferred approach is to stay fully reactive and only use `@Blocking` for legacy blocking libraries.
+
+---
+
+### 14. How do you test reactive Panache in Quarkus 3.9+?
+
+**Answer:**  
+Use `@QuarkusTest` and `@Inject` your reactive repositories or services. Because operations return `Uni`, you must await them in tests (or use `.subscribe().asCompletionStage()`).
+
+```java
+@QuarkusTest
+public class UserServiceTest {
+    @Inject
+    UserService service;
+
+    @Test
+    public void testCreateUser() {
+        User user = new User();
+        user.name = "Test";
+        
+        User saved = service.createUser(user)
+            .await().atMost(Duration.ofSeconds(5));
+        
+        assertNotNull(saved.id);
+    }
+}
+```
+
+**💡 Tip:** Use `await().indefinitely()` or `await().atMost(Duration)` to block the test thread until the reactive operation completes.
+
+---
+
+### 15. What are the common pitfalls when using reactive Panache?
+
+**Answer:**
+
+- **Accidental blocking** – Calling `Thread.sleep()`, `list().await()`, or using a blocking JDBC driver inside a reactive pipeline without moving to a worker thread.
+- **Lazy loading issues** – Trying to access a lazy association after the session is closed. Always fetch eagerly or keep the session alive.
+- **Transaction boundaries** – Forgetting to wrap multiple operations in a single `withTransaction()` block. Each `persist()` or `find()` runs in a separate transaction by default unless wrapped.
+- **Error handling** – Not handling failures with `.onFailure()` – in reactive, exceptions are propagated as failures in the `Uni`/`Multi`, so you need to recover or handle them explicitly.
+- **Using `@Transactional`** – This annotation does nothing in reactive context; it's silently ignored. Use `.withTransaction()` instead.
+
+---
+
+### 16. How does reactive Panache integrate with the REST endpoint's event loop?
+
+**Answer:**  
+When a REST endpoint returns `Uni` or `Multi`, Quarkus runs it on the **Vert.x event loop** thread (by default). The reactive Panache operations are also non‑blocking, so they return `Uni`/`Multi` that integrate seamlessly. The event loop thread is **not blocked** during database waits – it can handle other requests. When the database result arrives, the pipeline continues on the same or a different event‑loop thread.
+
+This architecture enables **high concurrency** with a very low thread count (typically < 10 threads per core).
+
+---
+
+### 17. How do you handle optimistic lock failures in reactive Panache?
+
+**Answer:**  
+Add a `@Version` field to your entity. When an optimistic lock conflict occurs, Hibernate Reactive throws a `OptimisticLockException` (or `StaleObjectStateException`) wrapped in the `Uni` failure. Handle it with `.onFailure()`:
+
+```java
+public Uni<User> updateUser(User user) {
+    return Panache.withTransaction(() -> user.persist().replaceWith(user))
+        .onFailure(OptimisticLockException.class)
+        .recoverWithItem(() -> {
+            // retry logic, or return a conflict response
+            return null;
+        });
+}
+```
+
+---
+
+### 18. What is the difference between `firstResult()` and `singleResult()` in reactive Panache?
+
+**Answer:**
+
+- **`firstResult()`** – Returns `Uni<T>` and emits the **first** result of the query, or `null` if no result is found. Does not throw if no result.
+- **`singleResult()`** – Returns `Uni<T>` and expects exactly **one** result. If zero or more than one result is found, the `Uni` fails with `NonUniqueResultException` or `NoResultException`.
+
+```java
+Uni<User> user = User.find("name", "John").firstResult(); // may be null
+Uni<User> user = User.find("id", 1L).singleResult(); // fails if not found
+```
+
+---
+
+### 19. Can you use reactive Panache with multiple datasources?
+
+**Answer:**  
+Yes, Quarkus supports multiple reactive datasources. You need to:
+1. Define multiple datasources in `application.properties`.
+2. Use `@PersistenceUnit` to specify the persistence unit (or `@DataSource` for the datasource).
+3. The Panache entities and repositories must be annotated or configured to use the correct persistence unit.
+
+This is more advanced and typically involves extending `PanacheEntityBase` and using `@PersistenceContext` with the unit name.
+
+---
+
+### 20. Summary: When should you choose reactive Panache over blocking Panache?
+
+**Answer:**
+
+Choose **reactive Panache** when:
+- Your application needs to handle **thousands of concurrent database connections** with low thread count.
+- You are building a fully **reactive stack** (reactive REST endpoints, reactive messaging, Kafka).
+- You target **serverless/Knative** environments where fast startup and low memory are critical.
+
+Choose **blocking Panache** when:
+- Your application is simple, with moderate concurrency.
+- You are more comfortable with imperative code and `@Transactional`.
+- You need to integrate with libraries that are blocking by nature.
+
+**Quarkus allows mixing both** – you can have some endpoints `@Blocking` and others reactive.
+

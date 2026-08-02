@@ -1,0 +1,185 @@
+---
+title: Kubernetes & OpenShift Deployment
+description: Guides on Quarkus deployment including Docker, Kubernetes, native image, and GraalVM.
+sidebar:
+  order: 2
+  label: Kubernetes & OpenShift Deployment
+---
+
+- Using quarkus-kubernetes to generate YAML manifests and deploying directly from the build.
+
+### 1. What makes Quarkus particularly well-suited for Kubernetes and OpenShift?
+
+**Answer:** Quarkus is designed as a **Kubernetes-native Java stack**. Its key features align perfectly with the requirements of cloud-native platforms:
+- **Fast Startup & Low Memory**: Essential for container orchestration where pods are frequently created and destroyed.
+- **Native Image Support**: Allows for building self-contained executables, resulting in extremely small container images.
+- **Zero-Configuration Generation**: The `quarkus-kubernetes` and `quarkus-openshift` extensions can automatically generate the necessary Kubernetes/OpenShift manifests (Deployment, Service, etc.).
+- **Health Checks**: Integrates with SmallRye Health to provide liveness and readiness probes required by Kubernetes.
+
+---
+
+### 2. How do you add the Kubernetes or OpenShift extensions to a Quarkus project?
+
+**Answer:** You can add them using the Quarkus CLI, Maven, or Gradle.
+
+*   **Quarkus CLI**:
+    ```bash
+    quarkus ext add kubernetes
+    # or
+    quarkus ext add openshift
+    ```
+*   **Maven**:
+    ```bash
+    ./mvnw quarkus:add-extension -Dextensions="io.quarkus:quarkus-kubernetes"
+    # or
+    ./mvnw quarkus:add-extension -Dextensions="io.quarkus:quarkus-openshift"
+    ```
+*   **pom.xml**:
+    ```xml
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-kubernetes</artifactId>
+    </dependency>
+    ```
+
+---
+
+### 3. How does Quarkus generate Kubernetes resources automatically?
+
+**Answer:** Quarkus leverages the **Dekorate** project to automatically generate Kubernetes resources based on sensible defaults and user-supplied configuration. After adding the `quarkus-kubernetes` extension, running a build (e.g., `./mvnw install`) will generate `kubernetes.json` and `kubernetes.yml` files in the `target/kubernetes/` directory. These files contain a standard `Deployment` and a `Service` for your application.
+
+---
+
+### 4. What are the different container image extensions Quarkus supports for building images?
+
+**Answer:** Quarkus provides extensions for building container images. The main ones are:
+- **Jib**: A fast and efficient tool that builds containers without requiring a Docker daemon.
+- **Docker**: Uses the local Docker daemon to build images.
+- **S2I (Source-to-Image)**: A framework that builds reproducible container images from source code. This is the default for the OpenShift extension.
+
+---
+
+### 5. How can you perform a single-step deployment to Kubernetes from a Quarkus build?
+
+**Answer:** By setting the `quarkus.kubernetes.deploy=true` property. When this is set to `true`, the Quarkus build will automatically:
+1.  Build the container image.
+2.  Push the image to a container registry.
+3.  Apply the generated Kubernetes resources to the target cluster.
+
+---
+
+### 6. How do you configure health probes for a Quarkus application on Kubernetes?
+
+**Answer:** The `quarkus-kubernetes` extension automatically configures liveness and readiness probes in the generated Deployment when you add the `quarkus-smallrye-health` extension.
+
+*   **Liveness Probe**: Uses `/q/health/live`
+*   **Readiness Probe**: Uses `/q/health/ready`
+
+These probes are essential for Kubernetes to manage the application's lifecycle. Furthermore, Quarkus extensions like Agroal (datasource) automatically add probes to check the status of dependencies like the database connection.
+
+---
+
+### 7. How do you customize the generated Kubernetes manifests?
+
+**Answer:** You can customize the manifests using configuration properties in `application.properties` or via annotations. Examples include:
+- **Replicas**: `quarkus.kubernetes.replicas=3`
+- **Container Port**: `quarkus.kubernetes.ports.container-port=8080`
+- **Image Pull Policy**: `quarkus.kubernetes.image-pull-policy=Always`
+- **Init Containers**: `quarkus.kubernetes.init-containers`
+
+---
+
+### 8. What is the difference between the `quarkus-kubernetes` and `quarkus-openshift` extensions?
+
+**Answer:** Both extensions generate Kubernetes resources, but `quarkus-openshift` is tailored for the OpenShift environment.
+- **Build Strategies**: The OpenShift extension supports OpenShift-specific build strategies like S2I and Docker build.
+- **Resources**: It can generate OpenShift-specific resources like `ImageStream`, `BuildConfig`, and `Route`.
+- **Deployment Kind**: It supports both the standard Kubernetes `Deployment` and the older OpenShift `DeploymentConfig`. In Quarkus 3.8+, `Deployment` is the default.
+
+---
+
+### 9. What build strategies are supported for deploying Quarkus applications to OpenShift?
+
+**Answer:** The `quarkus-openshift` extension supports multiple build strategies:
+
+| Build Strategy | Description | JVM Support | Native Support |
+| :--- | :--- | :--- | :--- |
+| **Docker** | Builds the container image using a Dockerfile, either locally or in CI, and then runs the build inside OpenShift. | ✅ Yes | ✅ Yes |
+| **S2I Binary** | Uses a pre-built JAR file as input for an S2I build. Fast for JVM deployments. | ✅ Yes | ❌ No |
+| **Source S2I** | The build process is performed entirely inside the OpenShift cluster from the source code. | ✅ Yes | ❌ No |
+
+The Docker build strategy is preferred as it supports both JVM and native executables.
+
+---
+
+### 10. How do you expose a Quarkus service on OpenShift using a Route?
+
+**Answer:** By default, the generated OpenShift service is not exposed to the outside world. To automatically create an OpenShift Route, set the `quarkus.openshift.route.expose` property to `true`.
+
+```properties
+quarkus.openshift.route.expose=true
+```
+
+You can also configure TLS for the Route:
+```properties
+quarkus.openshift.route.tls.termination=edge
+```
+
+---
+
+### 11. How do you deploy a Quarkus native application to OpenShift?
+
+**Answer:** To deploy a native application, you need to use the **Docker build strategy** and specify a custom Dockerfile for the native build.
+
+1.  Set the build strategy: `quarkus.openshift.build-strategy=docker`
+2.  Specify the native Dockerfile: `quarkus.openshift.native-dockerfile=src/main/docker/Dockerfile.native`
+3.  Build with the native profile: `./mvnw clean package -Pnative -Dquarkus.kubernetes.deploy=true`
+
+This will create a Docker build in OpenShift that produces a native executable and deploys it.
+
+---
+
+### 12. What are init containers in Quarkus and how are they used?
+
+**Answer:** Init containers are specialized containers that run before the main application container starts. In Quarkus, they are used to perform initialization tasks that must complete before the main application can start. For example, the Quarkus Kubernetes manifest generator can expose database migration tasks (like Flyway or Liquibase) as Kubernetes `Jobs` and use **init containers** to ensure the application only starts after the migrations have finished.
+
+You can further customize init containers using properties like `quarkus.kubernetes.init-containers`.
+
+---
+
+### 13. What are some common pitfalls when deploying Quarkus applications to Kubernetes?
+
+**Answer:** Common pitfalls include:
+- **Forgetting Health Checks**: Not adding the `quarkus-smallrye-health` extension, which prevents Kubernetes from properly managing the pod's lifecycle.
+- **Incorrect Image Registry**: Not configuring the container image registry correctly, leading to push failures.
+- **Resource Limits**: Not setting CPU and memory limits, which can lead to resource starvation or the pod being evicted.
+- **Missing Secrets/ConfigMaps**: Not properly injecting configuration via `ConfigMap` or `Secret`.
+- **Ignoring Native Build Time**: Underestimating the build time for native images and not using appropriate CI/CD strategies.
+
+---
+
+### 14. How do you read runtime configuration from Kubernetes ConfigMaps and Secrets?
+
+**Answer:** Quarkus integrates with the `quarkus-kubernetes-client` extension to read configuration from ConfigMaps and Secrets. You can configure the client to use a specific ConfigMap for your application's properties.
+
+```properties
+quarkus.kubernetes-config.enabled=true
+quarkus.kubernetes-config.config-maps=my-app-config
+```
+This allows you to externalize configuration and update it without rebuilding the application.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **Extensions** | `quarkus-kubernetes`, `quarkus-openshift` |
+| **Manifest Generation** | Automatically creates `Deployment`, `Service`, etc. in `target/kubernetes/` |
+| **Container Images** | Supports Jib, Docker, and S2I |
+| **Single-Step Deploy** | Set `quarkus.kubernetes.deploy=true` |
+| **Health Probes** | Auto-configured with `quarkus-smallrye-health` extension |
+| **OpenShift Build Strategies** | Docker (preferred for JVM & Native), S2I Binary, Source S2I |
+| **OpenShift Routes** | `quarkus.openshift.route.expose=true` |
+| **Init Containers** | Used for pre-startup tasks like DB migrations |
+| **Configuration** | `quarkus-kubernetes-client` for ConfigMaps/Secrets |

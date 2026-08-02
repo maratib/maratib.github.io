@@ -1,0 +1,189 @@
+---
+title: Micrometer Metrics
+description: Guides on Quarkus observability including metrics, tracing, health checks, and logging.
+sidebar:
+  order: 2
+  label: Micrometer Metrics
+---
+- Exposing custom application metrics `(counter, gauge, timer)` and integrating with Prometheus.
+
+### 1. What is Micrometer and why is it the recommended approach for metrics in Quarkus?
+
+**Answer:** Micrometer is a vendor-neutral metrics instrumentation library that provides a simple facade over the instrumentation clients for various monitoring systems. It acts as a metrics collection and abstraction layer.
+
+It is the recommended approach for metrics in Quarkus because it integrates seamlessly with the framework and provides a simple, consistent API for collecting various types of metrics. It supports a wide range of monitoring backends (like Prometheus, Graphite, and others), offering flexibility in choosing a monitoring solution. By integrating Micrometer, you can easily monitor your application's performance and gain valuable insights into its behavior.
+
+---
+
+### 2. How do you add Micrometer with Prometheus support to a Quarkus project?
+
+**Answer:** Add the `quarkus-micrometer-registry-prometheus` extension to your project:
+
+```bash
+quarkus extension add micrometer-registry-prometheus
+```
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
+</dependency>
+```
+This extension will load the core Micrometer extension as well as additional library dependencies required to support Prometheus. Once added, Quarkus automatically exposes the `/q/metrics` endpoint where you can observe the collected metrics in the Prometheus (OpenMetrics) format.
+
+---
+
+### 3. What are the core meter types provided by Micrometer and what are they used for?
+
+**Answer:** Micrometer provides a rich set of metrics to capture different aspects of application performance:
+
+1.  **Counter:** A single monotonically increasing value. Used to count events or occurrences, such as the number of requests received or the number of errors encountered. It is ideal for tracking things like total API calls, processed messages, or login attempts.
+2.  **Gauge:** Represents a single numerical value that can go up and down. Used for point-in-time measurements, such as the current memory usage, active sessions, or queue size.
+3.  **Timer:** Measures short-duration latencies and frequency of events. Useful for tracking the time taken for a method to execute (like a REST endpoint) and the number of times it was called.
+4.  **Distribution Summary:** Tracks the distribution of events, similar to a timer but for values that are not time-based. For example, tracking the size of a response payload.
+
+---
+
+### 4. What is the `MeterRegistry` and how do you get a reference to it?
+
+**Answer:** The `MeterRegistry` is the core API that generalizes metrics collection and propagation for different backend monitoring systems. It creates and manages all meters (Counters, Gauges, Timers, etc.). To register meters, you need a reference to a `MeterRegistry`, which is configured and maintained by the Micrometer extension.
+
+In Quarkus, you can obtain a reference by injecting it into your CDI bean:
+```java
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.inject.Inject;
+
+@Path("/example")
+public class ExampleResource {
+    @Inject
+    MeterRegistry registry;
+}
+```
+The `MeterRegistry` maintains an internal mapping between unique metric identifiers and tag combinations and specific meter instances.
+
+---
+
+### 5. How do you create a custom counter metric to track API calls in Quarkus?
+
+**Answer:** To create a custom counter, you inject the `MeterRegistry` and then create or register a new counter:
+
+```java
+@Path("/api")
+@ApplicationScoped
+public class ApiResource {
+    @Inject
+    MeterRegistry registry;
+    private Counter apiCallCounter;
+
+    @PostConstruct
+    void init() {
+        apiCallCounter = registry.counter("api.calls.total");
+    }
+
+    @GET
+    public String apiMethod() {
+        apiCallCounter.increment(); // Record an API call
+        return "OK";
+    }
+}
+```
+The `registry.counter("api.calls.total")` method registers a new counter with the given name. You can also add tags (key-value pairs) for more detailed dimensions:
+```java
+Counter.builder("api.calls.total")
+       .tag("method", "GET")
+       .register(registry);
+```
+Tags allow for more granular filtering and aggregation in monitoring systems like Prometheus.
+
+---
+
+### 6. What are the advantages and disadvantages of using Micrometer?
+
+**Answer:**
+
+**Advantages:**
+*   **Seamless Integration:** Integrates effortlessly with Quarkus, needing minimal configuration.
+*   **Multi-backend Support:** Supports multiple monitoring systems (Prometheus, Graphite, etc.).
+*   **Rich Set of Metrics:** Provides various types of metrics (counters, timers, gauges).
+*   **Ease of Use:** Simple API for defining and collecting metrics.
+*   **Open-source and Community Support:** Active development and a large community.
+
+**Disadvantages:**
+*   **Learning Curve:** Developers need to learn the concepts and APIs.
+*   **Overhead:** Instrumentation can introduce some overhead if not used judiciously.
+*   **Complexity in Large Applications:** Managing a large number of metrics can become cumbersome.
+*   **Dependency Management:** Requires careful management of dependencies.
+
+---
+
+### 7. How does Quarkus simplify the collection of JVM metrics?
+
+**Answer:** The `quarkus-micrometer` extension provides built-in support for collecting a wide range of JVM metrics out-of-the-box without any additional code. These include metrics for:
+*   **Memory:** Heap and non-heap usage, GC counts and times.
+*   **Threads:** Active thread counts, states.
+*   **Classes:** Loaded and unloaded class counts.
+*   **CPU:** System and process CPU usage.
+
+This automatic instrumentation provides immediate visibility into the health and performance of the JVM.
+
+---
+
+### 8. What is the default Prometheus metrics format in Quarkus 3.9+ and how can you change it?
+
+**Answer:** Starting with recent Quarkus versions, the default format for the Prometheus metrics endpoint is **OpenMetrics**. To change this to the older "plain" text format, you can add the following configuration property to your `application.properties`:
+```properties
+quarkus.micrometer.export.prometheus.format=plain
+```
+This provides flexibility for compatibility with older monitoring systems or tooling.
+
+---
+
+### 9. How do you use the `@Timed` annotation to monitor method execution time?
+
+**Answer:** Micrometer provides the `@Timed` annotation to easily track the duration and frequency of method executions. It automatically creates a timer that records how long the method takes to run.
+
+```java
+import io.micrometer.core.annotation.Timed;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+
+@Path("/example")
+public class ExampleResource {
+    @GET
+    @Path("/long-running")
+    @Timed(name = "long.running.time", description = "Time taken to execute long-running operation")
+    public String longRunningOperation() {
+        // Simulate long-running code
+        return "Done";
+    }
+}
+```
+The `@Timed` annotation can also be applied at the class level to monitor all methods. The resulting metrics can be used to analyze percentiles and histograms of execution times.
+
+---
+
+### 10. What is the `@Counted` annotation and when would you use it?
+
+**Answer:** The `@Counted` annotation is used to count the number of times a method is invoked. It's a simple way to track the volume of requests to a particular operation. While a Counter can be manually incremented, the annotation provides a more declarative approach.
+
+```java
+import io.micrometer.core.annotation.Counted;
+
+@Counted(value = "items.created.count", description = "Number of items created")
+public void createItem(Item item) {
+    // code to create item
+}
+```
+This is especially useful for business metrics, such as counting the number of orders placed, user registrations, or any other significant business event.
+
+---
+
+### 11. What are some best practices when using Micrometer in Quarkus?
+
+**Answer:**
+*   **Define Dimensions (Tags):** Use tags to add dimensions to your metrics. This allows for better aggregation, filtering, and grouping in monitoring tools like Grafana. For example, tag an HTTP request metric with `method`, `status`, and `uri`.
+*   **Use Descriptive Names:** Follow a naming convention (e.g., `[application].[component].[metric]`) for your metrics to make them easily searchable.
+*   **Choose the Right Meter Type:** Use Counters for values that only increase, Gauges for values that can fluctuate, and Timers for latency measurements.
+*   **Avoid High-Cardinality Tags:** Do not use tags with a very large number of possible values (like user IDs or request IDs) as this can overwhelm your monitoring system.
+*   **Be Mindful of Overhead:** While low, excessive metrics can add overhead. Be selective about what you instrument, especially in high-traffic paths.
+*   **Test in Development:** Verify that your custom metrics appear correctly on the `/q/metrics` endpoint early in development.

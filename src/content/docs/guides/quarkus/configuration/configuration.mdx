@@ -1,0 +1,391 @@
+---
+title: Configuration Profiles & Externalization
+description: Guides on Quarkus configuration including MicroProfile Config, profiles, and secrets management.
+sidebar:
+  order: 1
+  label: Configuration
+---
+- Using `%dev, %prod, %test` profiles, overriding with environment variables, and custom ConfigSource.
+
+### 1. What are configuration profiles in Quarkus and why are they important?
+
+**Answer:** Configuration profiles allow you to define different sets of configuration properties for different environments (e.g., development, testing, production). They are important because they enable you to:
+- **Separate concerns** – Keep environment-specific settings (database URLs, credentials, feature flags) isolated.
+- **Simplify deployment** – Use the same artifact (JAR/native image) across environments; only the profile changes.
+- **Avoid hardcoding** – No need to modify code or properties files per environment.
+
+Quarkus supports three built-in profiles by default: `dev`, `test`, and `prod`. You can also define custom profiles.
+
+---
+
+### 2. What are the built-in profiles in Quarkus and when are they activated?
+
+**Answer:**
+
+| Profile | When activated | Purpose |
+| :--- | :--- | :--- |
+| **`dev`** | When running in development mode (`quarkus:dev`) | Hot reload, debug logging, Dev Services, etc. |
+| **`test`** | When running tests (`@QuarkusTest`) | Test-specific configurations, in-memory databases, etc. |
+| **`prod`** | When running in production (default if no other profile) | Optimized for performance, production databases, security. |
+
+You can also define custom profiles (e.g., `staging`, `qa`) and activate them manually.
+
+---
+
+### 3. How do you define profile-specific configuration in `application.properties`?
+
+**Answer:** Use the `%{profile}.` prefix:
+
+```properties
+# Default (applies to all profiles)
+quarkus.http.port=8080
+quarkus.log.level=INFO
+
+# Dev profile overrides
+%dev.quarkus.log.level=DEBUG
+%dev.quarkus.http.port=8081
+%dev.quarkus.datasource.db-kind=h2
+%dev.quarkus.datasource.jdbc.url=jdbc:h2:mem:testdb
+
+# Prod profile overrides
+%prod.quarkus.http.port=80
+%prod.quarkus.log.level=WARN
+%prod.quarkus.datasource.db-kind=postgresql
+%prod.quarkus.datasource.jdbc.url=${DATABASE_URL}
+```
+
+Properties without a `%{profile}.` prefix apply to **all** profiles unless overridden.
+
+---
+
+### 4. How do you activate a specific profile when running a Quarkus application?
+
+**Answer:** There are multiple ways:
+
+1. **System property**:
+   ```bash
+   java -Dquarkus.profile=staging -jar myapp-runner.jar
+   ```
+
+2. **Environment variable**:
+   ```bash
+   QUARKUS_PROFILE=staging ./myapp-runner
+   ```
+
+3. **In `application.properties`** (not recommended, but possible):
+   ```properties
+   quarkus.profile=staging
+   ```
+
+4. **Maven/Gradle build**:
+   ```bash
+   ./mvnw quarkus:dev -Dquarkus.profile=staging
+   ```
+
+**💡 Tip:** In Kubernetes, set the environment variable `QUARKUS_PROFILE` in the container spec.
+
+---
+
+### 5. What is the priority order for configuration sources in Quarkus?
+
+**Answer:** Quarkus resolves configuration in the following order (higher to lower priority):
+
+1. **System properties** (`-Dkey=value`)
+2. **Environment variables** (`ENV_KEY=value`)
+3. **`application.properties`** (or `application.yml`) – profile-specific overrides (`%dev.key`)
+4. **Default values** (from `application.properties` without profile prefix)
+
+This allows you to override any property at runtime without changing the packaged artifact.
+
+---
+
+### 6. How do you access configuration properties in your Quarkus code?
+
+**Answer:** Use `@ConfigProperty`:
+
+```java
+@ApplicationScoped
+public class AppConfig {
+    @ConfigProperty(name = "app.greeting", defaultValue = "Hello")
+    String greeting;
+
+    @ConfigProperty(name = "app.timeout", defaultValue = "30")
+    int timeout;
+
+    @ConfigProperty(name = "app.features.enabled")
+    Optional<Boolean> featuresEnabled;
+}
+```
+
+For groups of related properties, use `@ConfigMapping`:
+
+```java
+@ConfigMapping(prefix = "app")
+public interface AppConfig {
+    String greeting();
+    int timeout();
+    Features features();
+    
+    interface Features {
+        boolean enabled();
+        List<String> toggles();
+    }
+}
+```
+
+---
+
+### 7. How do you use environment variables to override configuration in Quarkus?
+
+**Answer:** Quarkus automatically maps environment variables to configuration properties by converting:
+- Uppercase letters → lowercase
+- Underscores (`_`) → dots (`.`)
+
+**Examples:**
+| Property | Environment Variable |
+| :--- | :--- |
+| `quarkus.http.port` | `QUARKUS_HTTP_PORT` |
+| `quarkus.datasource.jdbc.url` | `QUARKUS_DATASOURCE_JDBC_URL` |
+| `app.greeting` | `APP_GREETING` |
+
+This is especially useful in containerized environments (Kubernetes, Docker).
+
+---
+
+### 8. What is the difference between `application.properties` and `application.yml` in Quarkus?
+
+**Answer:** Both are supported, and you can use either or both. If both are present, `application.properties` takes precedence over `application.yml`.
+
+**`application.properties`** – Key-value pairs:
+```properties
+quarkus.http.port=8080
+quarkus.log.level=INFO
+%dev.quarkus.log.level=DEBUG
+```
+
+**`application.yml`** – YAML format, better for complex configurations:
+```yaml
+quarkus:
+  http:
+    port: 8080
+  log:
+    level: INFO
+"%dev":
+  quarkus:
+    log:
+      level: DEBUG
+```
+
+Quarkus recommends `application.properties` for its simplicity and build-time optimization.
+
+---
+
+### 9. What are Quarkus "Dev Services" and how do they relate to configuration?
+
+**Answer:** **Dev Services** is a feature that automatically starts and configures containers (e.g., PostgreSQL, Kafka, Redis) in development and test modes. It requires zero configuration – just add the extension and Quarkus starts the container with default settings.
+
+**Configuration overrides:**
+```properties
+%dev.quarkus.datasource.db-kind=postgresql
+%dev.quarkus.datasource.jdbc.url=jdbc:postgresql://localhost:5432/mydb
+```
+
+To disable Dev Services:
+```properties
+quarkus.devservices.enabled=false
+```
+
+Dev Services is a huge productivity boost for local development.
+
+---
+
+### 10. How do you define custom configuration profiles (e.g., `staging`, `qa`)?
+
+**Answer:** You can define any custom profile name in `application.properties`:
+
+```properties
+# Staging profile
+%staging.quarkus.http.port=8080
+%staging.quarkus.datasource.jdbc.url=jdbc:postgresql://staging-db:5432/mydb
+%staging.quarkus.log.level=INFO
+
+# QA profile
+%qa.quarkus.http.port=8080
+%qa.quarkus.datasource.jdbc.url=jdbc:postgresql://qa-db:5432/mydb
+%qa.quarkus.log.level=DEBUG
+```
+
+Activate them with `-Dquarkus.profile=staging` or `QUARKUS_PROFILE=staging`.
+
+---
+
+### 11. How do you externalize sensitive configuration (secrets) in Quarkus?
+
+**Answer:** Use environment variables or external configuration sources. **Never** hardcode secrets in `application.properties` that is committed to version control.
+
+**Approaches:**
+1. **Environment variables** – Set `DATABASE_PASSWORD=secret` and reference with `${DATABASE_PASSWORD}` in properties.
+2. **Kubernetes Secrets** – Mount secrets as environment variables or files.
+3. **Vault/HashiCorp** – Use the `quarkus-vault` extension to fetch secrets dynamically.
+4. **External `application.properties`** – Place a separate `application.properties` outside the JAR and set `quarkus.config.locations` to point to it.
+
+**Example using environment variable:**
+```properties
+quarkus.datasource.password=${DATABASE_PASSWORD:defaultPass}
+```
+
+---
+
+### 12. What is the `@ConfigProperties` annotation (deprecated) and what replaced it?
+
+**Answer:** `@ConfigProperties` (from MicroProfile Config) is deprecated in Quarkus 3.x. It has been replaced by **`@ConfigMapping`** (from Quarkus) and **`@ConfigProperty`** (still used for single properties).
+
+**`@ConfigMapping`** is type-safe, immutable, and build-time optimized. It is the recommended approach for grouped configurations.
+
+```java
+@ConfigMapping(prefix = "app")
+public interface AppConfig {
+    String greeting();
+    int timeout();
+}
+```
+
+---
+
+### 13. How do you use configuration profiles with native images?
+
+**Answer:** Configuration profiles work seamlessly in native images. The active profile is determined at runtime (via `quarkus.profile` or environment variable). However, profile-specific properties that affect build-time behavior (like `quarkus.native.*`) are evaluated at build time. Runtime profiles are used for runtime properties (like logging, database URLs).
+
+**Best practice:** Use `%prod` for production-specific build-time configurations and runtime overrides for everything else.
+
+---
+
+### 14. How do you test different configuration profiles in `@QuarkusTest`?
+
+**Answer:** Use `@TestProfile` to define a custom profile for tests:
+
+```java
+@QuarkusTest
+@TestProfile(TestProfile.class)
+public class ConfigTest {
+    @ConfigProperty(name = "app.greeting")
+    String greeting;
+
+    @Test
+    public void testGreeting() {
+        assertEquals("Hello from test", greeting);
+    }
+
+    public static class TestProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of("app.greeting", "Hello from test");
+        }
+    }
+}
+```
+
+Alternatively, use `@TestPropertySource` (not available in Quarkus) – the recommended way is `@TestProfile`.
+
+---
+
+### 15. What is the difference between `%dev.` and `%test.` profiles in Quarkus?
+
+**Answer:**
+
+| Profile | Activation | Purpose | Typical overrides |
+| :--- | :--- | :--- | :--- |
+| `%dev` | `quarkus:dev` | Development environment | Debug logging, in-memory DB, Dev Services, hot reload |
+| `%test` | `@QuarkusTest` | Test execution | Test DB (e.g., H2), mocked services, faster timeouts |
+
+Both are separate; you can have different configurations for each. `%test` overrides apply **only** during test execution.
+
+---
+
+### 16. How do you load configuration from an external file in Quarkus?
+
+**Answer:** Use `quarkus.config.locations` to specify additional configuration sources:
+
+```properties
+quarkus.config.locations=/etc/myapp/application.properties,file:./config/application.properties
+```
+
+You can also use `quarkus.config.ordinal` to set priority between sources.
+
+**Example:** Place an `application.properties` file in `/etc/myapp/` with production credentials. The application will load it at startup, overriding the packaged defaults.
+
+---
+
+### 17. How do you handle configuration that is only available at runtime (e.g., cloud environment variables)?
+
+**Answer:** Use **environment variable expansion** in `application.properties`:
+
+```properties
+quarkus.datasource.jdbc.url=${DATABASE_URL:jdbc:postgresql://localhost:5432/default}
+quarkus.datasource.username=${DATABASE_USER:admin}
+quarkus.datasource.password=${DATABASE_PASSWORD:}
+```
+
+If the environment variable is not set, the default value (after `:`) is used. This allows the same JAR to run in multiple environments with only environment variables changing.
+
+---
+
+### 18. What is the `quarkus.profile` property and how does it interact with `%prod`?
+
+**Answer:** `quarkus.profile` sets the active profile. If not set, Quarkus defaults to:
+- `dev` – when running `quarkus:dev`
+- `test` – when running tests
+- `prod` – for all other cases (JAR/native execution)
+
+When `quarkus.profile=prod` (or not set), properties prefixed with `%prod.` are applied. This is why you typically configure production settings under `%prod.`.
+
+---
+
+### 19. Can you use `@ConfigProperty` with a default value that references another property?
+
+**Answer:** No, `@ConfigProperty` does not support expressions in default values directly. However, you can use a placeholder in `application.properties`:
+
+```properties
+app.base.url=http://localhost:8080
+app.api.url=${app.base.url}/api
+```
+
+Then in code:
+```java
+@ConfigProperty(name = "app.api.url")
+String apiUrl;
+```
+
+Quarkus expands `${...}` expressions at startup.
+
+---
+
+### 20. What are the common pitfalls with configuration in Quarkus?
+
+**Answer:**
+
+- **Forgetting profile prefix** – Properties without `%dev.` apply to all profiles, which can accidentally affect production.
+- **Environment variable naming** – Quarkus uses a specific naming convention (e.g., `QUARKUS_HTTP_PORT`, not `quarkus.http.port`). Incorrect casing leads to ignored variables.
+- **Missing default values** – If a required property is missing and no default is provided, startup fails. Always use `defaultValue` or environment fallbacks.
+- **Overriding build-time properties at runtime** – Some properties (like `quarkus.native.*`) are **build-time only**. Changing them at runtime has no effect. Check the Quarkus documentation for build-time vs. runtime properties.
+- **Profile activation in tests** – Tests use the `test` profile by default. If you want to use `dev` or a custom profile, use `@TestProfile` to override.
+- **Using `@ConfigProperties`** – It's deprecated; migrate to `@ConfigMapping` for better type safety and build-time optimization.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **Built-in profiles** | `dev`, `test`, `prod` |
+| **Custom profiles** | `%staging.`, `%qa.`, etc. |
+| **Activation** | `quarkus.profile` system property or environment variable |
+| **Override priority** | System props > Env vars > Profile properties > Default properties |
+| **Environment variables** | `QUARKUS_HTTP_PORT` → `quarkus.http.port` |
+| **@ConfigProperty** | Single property injection with `defaultValue` |
+| **@ConfigMapping** | Type-safe grouped configuration (recommended) |
+| **External config** | `quarkus.config.locations` |
+| **Secrets** | Use environment variables, Kubernetes secrets, or Vault |
+| **Testing** | `@TestProfile` with `getConfigOverrides()` |
+| **Build-time vs Runtime** | Some properties are build-time only; check documentation |
+

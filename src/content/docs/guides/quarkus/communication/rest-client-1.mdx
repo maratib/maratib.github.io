@@ -1,0 +1,206 @@
+---
+title: Reactive REST Client
+description: Guides on Quarkus communication including REST clients, Kafka, messaging, and reactive streams.
+sidebar:
+  order: 1
+  label: Reactive REST Client 1
+---
+- Defining interfaces, handling errors (response object vs. exceptions), and injecting with `@RestClient`.
+
+### 1. What is the Quarkus Reactive REST Client and how is it different from the standard REST Client?  
+
+**Answer:**  
+The Quarkus Reactive REST Client is a type-safe HTTP client built on top of **Mutiny** (Quarkus's reactive programming library) and **Vert.x** HTTP client. It allows you to define an interface (typically a Jakarta REST interface) with an annotation, and Quarkus generates a **proxy implementation** at build time. The key difference is that it integrates seamlessly with Quarkus's reactive programming model, returning `Uni` (single item) and `Multi` (stream of items) instead of blocking `Response` objects. It also automatically handles features like service discovery, load balancing, and circuit breakers when used with the correct extensions.
+
+### 2. How do you create a Reactive REST Client in Quarkus?  
+
+**Answer:**  
+You define a Jakarta REST interface and annotate it with `@Path`. Then, you annotate the interface with `@RegisterRestClient` (from `io.quarkus.rest.client.reactive`) and specify the base URI.
+
+**Example:**
+```java
+package com.example.client;
+
+import io.smallrye.mutiny.Uni;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+
+@Path("/api")
+@RegisterRestClient(baseUri = "http://external-service/api")
+public interface ExternalServiceClient {
+
+    @GET
+    @Path("/resource/{id}")
+    Uni<String> getResource(String id);
+}
+```
+
+Then you inject it using `@Inject` or `@RestClient`.
+
+### 3. How do you configure the base URI for a Reactive REST Client?  
+
+**Answer:**  
+You can set the base URI in two main ways:
+
+1. **Directly on the interface** using `@Path` with the `baseUri` attribute:
+   ```java
+   @Path("http://external-service/api")
+   @RegisterRestClient
+   ```
+2. **Using configuration properties** (recommended for flexibility):
+   ```properties
+   mp.rest.client.com.example.client.ExternalServiceClient.url=http://external-service/api
+   ```
+   (Note: `mp.rest.client.[ClientName].url`).
+
+### 4. How do you inject a Reactive REST Client?  
+
+**Answer:**  
+You use the `@Inject` annotation or the convenience annotation `@RestClient` (from `org.eclipse.microprofile.rest.client.inject.RestClient`).
+
+**Example:**
+```java
+import io.quarkus.rest.client.reactive.RestClient;
+import jakarta.inject.Inject;
+
+@ApplicationScoped
+public class MyService {
+
+    @RestClient
+    ExternalServiceClient externalServiceClient;
+
+    public Uni<String> callExternalService(String id) {
+        return externalServiceClient.getResource(id);
+    }
+}
+```
+
+### 5. What reactive types (Uni/Multi) does the Reactive REST Client support?  
+
+**Answer:**  
+It primarily works with **`io.smallrye.mutiny.Uni`** (for a single result) and **`io.smallrye.mutiny.Multi`** (for a stream of results). You can also use **`jakarta.ws.rs.core.Response`** when you need full control over the HTTP response, but the reactive types are preferred for non-blocking integration.
+
+### 6. How do you handle HTTP headers in the Reactive REST Client?  
+
+**Answer:**  
+You can use `@HeaderParam` on individual parameters, or `@Produces` and `@Consumes` on the method to specify content types. For custom headers, you can use `@ClientHeaderParam` on the interface or method.
+
+**Example with custom headers:**
+```java
+import jakarta.ws.rs.core.HttpHeaders;
+import org.eclipse.microprofile.rest.client.annotation.ClientHeaderParam;
+
+@Path("/api")
+@RegisterRestClient
+@ClientHeaderParam(name = HttpHeaders.AUTHORIZATION, value = "Bearer {token}")
+public interface SecuredServiceClient {
+    @GET
+    @Path("/secret")
+    Uni<String> getSecret(@HeaderParam("token") String token); // Can also be injected
+}
+```
+
+### 7. How do you handle authentication with the Reactive REST Client?  
+
+**Answer:**  
+You can use `@ClientHeaderParam` to inject authentication tokens (e.g., Bearer tokens) or query parameters.
+
+**Example with Bearer token:**
+```java
+@Path("/api")
+@RegisterRestClient
+@ClientHeaderParam(name = "Authorization", value = "Bearer {token}")
+public interface AuthClient {
+    String getToken(); // The parameter name here must match the value in the annotation
+}
+```
+
+### 8. How do you handle timeouts and connection settings for the Reactive REST Client?  
+
+**Answer:**  
+You configure these via MicroProfile Rest Client configuration properties, typically in `application.properties`:
+
+```properties
+# Timeout after 2 seconds
+mp.rest.client.com.example.client.ExternalServiceClient.connectionTimeout=2000
+
+# Read timeout after 5 seconds
+mp.rest.client.com.example.client.ExternalServiceClient.readTimeout=5000
+
+# Connection pool size
+mp.rest.client.com.example.client.ExternalServiceClient.connectionPoolSize=20
+
+# Use HTTP/2
+mp.rest.client.com.example.client.ExternalServiceClient.http2=true
+```
+
+### 9. How do you handle failures and implement retry logic?  
+
+**Answer:**  
+You can use Mutiny's built-in retry operators on the returned `Uni` or `Multi`.
+
+**Example with retry:**
+```java
+public Uni<String> getResourceWithRetry(String id) {
+    return externalServiceClient.getResource(id)
+            .onFailure()
+            .retry()
+            .atMost(3);
+}
+```
+
+You can also use the `Retry` extension for more advanced retry policies.
+
+### 10. How do you handle circuit breakers with the Reactive REST Client?  
+
+**Answer:**  
+You need to include the **`quarkus-smallrye-fault-tolerance`** extension. This allows you to use the **MP Fault Tolerance** annotations on your client interface methods to define circuit breakers, fallbacks, and rate limiters.
+
+**Example with circuit breaker:**
+```java
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+
+@Path("/api")
+@RegisterRestClient
+public interface FaultTolerantClient {
+
+    @GET
+    @Path("/data")
+    @CircuitBreaker(delay = 5000, requestVolumeThreshold = 10, failureRatio = 0.5)
+    Uni<String> getData();
+}
+```
+
+### 11. How do you handle logging of requests and responses?  
+
+**Answer:**  
+The Reactive REST Client integrates with the **MicroProfile Rest Client Logging** extension. You enable it in `application.properties`:
+
+```properties
+# Enable logging for the client
+mp.rest.client.com.example.client.ExternalServiceClient/mp-rest-client-logging.enabled=true
+
+# Set log level
+mp.rest.client.com.example.client.ExternalServiceClient/mp-rest-client-logging.level=INFO
+```
+
+### 12. Can you use the Reactive REST Client in a reactive pipeline with other Mutiny operations?  
+
+**Answer:**  
+Yes, that's the main purpose! Since it returns `Uni` and `Multi`, you can chain them with other reactive operators:
+
+```java
+public Uni<String> processData(String input) {
+    return externalServiceClient.getResource(input)
+            .map(response -> "Processed: " + response)
+            .onItem().ifNull()
+            .afterDelay(Duration.ofSeconds(2));
+}
+```
+
+### 13. How do you use the Reactive REST Client with Service Discovery?  
+
+**Answer:**  
+When using

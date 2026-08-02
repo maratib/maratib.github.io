@@ -1,0 +1,386 @@
+---
+title: Role-Based Access Control (RBAC)
+description: Guides on Quarkus security including authentication, authorization, OIDC, JWT, and RBAC.
+sidebar:
+  order: 2
+  label: RBAC
+---
+- Using `@RolesAllowed, @PermitAll, @DenyAll,` and custom security identities with SecurityIdentity.
+
+### 1. What annotations does Quarkus support for role-based authorization?
+
+**Answer:**  
+Quarkus supports the standard Jakarta Security annotations:
+- **`@RolesAllowed({"role1", "role2"})`** – Allows access only to users with at least one of the specified roles.
+- **`@PermitAll`** – Allows access to all authenticated users (and optionally unauthenticated, depending on configuration).
+- **`@DenyAll`** – Denies access to everyone, regardless of authentication.
+
+These annotations can be placed on JAX‑RS resource methods, CDI beans, and even service methods (thanks to CDI interceptors). They work with both OIDC (`quarkus-oidc`) and pure JWT (`quarkus-smallrye-jwt`) security.
+
+**Example:**
+```java
+@Path("/api")
+@ApplicationScoped
+public class AdminResource {
+    @GET
+    @Path("/admin")
+    @RolesAllowed("admin")
+    public String adminOnly() { return "Admin data"; }
+
+    @GET
+    @Path("/public")
+    @PermitAll
+    public String publicEndpoint() { return "Public"; }
+}
+```
+
+---
+
+### 2. How does Quarkus map JWT claims to roles?
+
+**Answer:**  
+Quarkus uses the **`groups`** claim (as defined by MicroProfile JWT 2.0) by default. The claim can be a `String` or an array of strings. However, identity providers like Keycloak store roles in nested structures (e.g., `realm_access.roles` or `resource_access.{client}.roles`).
+
+To map a custom claim to roles, you configure `quarkus.oidc.roles.role-claim-path` in `application.properties`:
+
+```properties
+# For Keycloak realm roles
+quarkus.oidc.roles.role-claim-path=realm_access/roles
+
+# Or for client-specific roles
+quarkus.oidc.roles.role-claim-path=resource_access/my-client/roles
+```
+
+If using `quarkus-smallrye-jwt` without OIDC, you can set:
+```properties
+mp.jwt.verify.claims.groups=my-custom-claims
+```
+
+---
+
+### 3. What is the `SecurityIdentity` and how do you use it for programmatic authorization?
+
+**Answer:**  
+`SecurityIdentity` (from `io.quarkus.security.identity.SecurityIdentity`) represents the authenticated user's identity and roles. You can inject it to perform runtime checks:
+
+```java
+@Inject
+SecurityIdentity identity;
+
+public void doSomething() {
+    if (identity.hasRole("admin")) {
+        // perform admin operation
+    }
+    // retrieve principal
+    String username = identity.getPrincipal().getName();
+}
+```
+
+You can also use `@Authenticated` to require authentication but not specific roles.
+
+---
+
+### 4. Can you use `@RolesAllowed` on service methods (not just REST endpoints)?
+
+**Answer:**  
+Yes. Quarkus's CDI interceptor for security works on any CDI bean method, provided the bean is proxied (e.g., `@ApplicationScoped`). This allows you to secure business logic at the service layer, not just the REST layer.
+
+```java
+@ApplicationScoped
+public class OrderService {
+    @RolesAllowed("admin")
+    public void deleteOrder(Long id) {
+        // only admins can delete
+    }
+}
+```
+
+The interceptor is applied at build time, making it native‑friendly.
+
+---
+
+### 5. What is the difference between `@PermitAll` and having no annotation?
+
+**Answer:**  
+- **`@PermitAll`** – Explicitly allows access to the method for **authenticated** users only (unless configured otherwise). The request must have a valid security identity.
+- **No annotation** – The method inherits the security constraints from the class level or defaults to `@DenyAll` if `quarkus.security.jaxrs.deny-unannotated-endpoints=true`.
+
+If `deny-unannotated-endpoints` is `false` (default), unannotated endpoints are **permissive** (allow all, even unauthenticated).
+
+**Recommendation:** Always explicitly annotate to avoid ambiguity and to follow the principle of least surprise.
+
+---
+
+### 6. How do you configure global default roles or deny all unannotated endpoints?
+
+**Answer:**  
+In `application.properties`:
+
+```properties
+# Deny access to any endpoint without a security annotation
+quarkus.security.jaxrs.deny-unannotated-endpoints=true
+
+# Assign a default role requirement (like a catch-all)
+quarkus.security.jaxrs.default-roles-allowed=user
+```
+
+If both are set, `default-roles-allowed` applies to unannotated endpoints. Note the CVE‑2023‑5675 issue (fixed in later versions) if you use these features with abstract class inheritance.
+
+---
+
+### 7. How do you implement fine‑grained (resource‑based) authorization beyond roles?
+
+**Answer:**  
+Use a custom security interceptor or `@CheckPermission` (from MicroProfile). You can also use `SecurityIdentity` to check specific conditions:
+
+```java
+@Inject
+SecurityIdentity identity;
+
+public boolean canAccessResource(String resourceId) {
+    return identity.hasRole("admin") ||
+           identity.getPrincipal().getName().equals(resourceId);
+}
+```
+
+For more complex policies, implement a `SecurityInterceptor` or use the `quarkus-security` SPI to define custom permission checks.
+
+---
+
+### 8. How do you map roles from a token that uses a different claim name (e.g., `scopes`)?
+
+**Answer:**  
+Use `quarkus.oidc.roles.role-claim-path` with the claim path. For example, if roles are in a claim `authorities` as an array:
+
+```properties
+quarkus.oidc.roles.role-claim-path=authorities
+```
+
+If the claim is a space‑separated string, you can configure:
+```properties
+quarkus.oidc.roles.role-claim-separator=,
+```
+
+---
+
+### 9. How do you test RBAC in Quarkus without a real OIDC provider?
+
+**Answer:**  
+Use `@TestSecurity` and `@OidcSecurity` annotations:
+
+```java
+@QuarkusTest
+public class AdminResourceTest {
+    @Test
+    @TestSecurity(user = "alice", roles = {"admin", "user"})
+    public void testAdminEndpoint() {
+        given().when().get("/api/admin")
+               .then().statusCode(200);
+    }
+
+    @Test
+    @TestSecurity(user = "bob", roles = {"user"})
+    public void testAdminEndpointForbidden() {
+        given().when().get("/api/admin")
+               .then().statusCode(403);
+    }
+}
+```
+
+`@TestSecurity` creates a mock `SecurityIdentity` without contacting a real OIDC server. You can also set `@OidcSecurity` to mock OIDC provider interactions.
+
+---
+
+### 10. What is the difference between `@RolesAllowed` and using `@SecurityContext` manually?
+
+**Answer:**  
+- **`@RolesAllowed`** – Declarative, easier to read, and performs role checking via a build‑time interceptor. It's the recommended approach.
+- **Manual check** – Using `SecurityContext` (JAX‑RS) or `SecurityIdentity` gives you fine‑grained control but requires boilerplate. It's useful for dynamic or contextual checks.
+
+```java
+@Context SecurityContext ctx;
+if (ctx.isUserInRole("admin")) { ... }
+```
+
+---
+
+### 11. How does role inheritance work? Can you have hierarchical roles?
+
+**Answer:**  
+Quarkus does not natively support role hierarchy (e.g., `admin` implies `user`). You must either:
+- Assign all necessary roles to the user at the identity provider.
+- Or implement a custom `SecurityIdentity` augmenter that adds inherited roles programmatically.
+
+**Example augmenter:**
+```java
+@ApplicationScoped
+public class CustomSecurityIdentityAugmenter implements SecurityIdentityAugmentor {
+    @Override
+    public Uni<SecurityIdentity> augment(SecurityIdentity identity, 
+                                         AuthenticationRequestContext context) {
+        Set<String> roles = new HashSet<>(identity.getRoles());
+        if (roles.contains("admin")) {
+            roles.add("user");
+        }
+        return Uni.createFrom().item(new QuarkusSecurityIdentity.Builder(identity)
+                .setRoles(roles)
+                .build());
+    }
+}
+```
+
+---
+
+### 12. What is the default behavior when no security annotations are present and `deny-unannotated-endpoints` is `false`?
+
+**Answer:**  
+All endpoints are **permissive** – any request (including unauthenticated) can access them. This is the default to avoid breaking existing applications. For new projects, it's best to set `deny-unannotated-endpoints=true` to require explicit permissions.
+
+---
+
+### 13. How do you secure a method based on the method's parameters (e.g., owner ID matches user ID)?
+
+**Answer:**  
+Use a custom security interceptor that checks the `SecurityIdentity` and the method arguments:
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface OwnerCheck {}
+
+@ApplicationScoped
+public class OwnerCheckInterceptor {
+    @Inject
+    SecurityIdentity identity;
+
+    @AroundInvoke
+    public Object check(InvocationContext ctx) throws Exception {
+        Object[] params = ctx.getParameters();
+        Long userId = (Long) params[0]; // assume first param is user ID
+        String currentUser = identity.getPrincipal().getName();
+        if (!currentUser.equals(userId.toString()) && !identity.hasRole("admin")) {
+            throw new ForbiddenException("Not owner");
+        }
+        return ctx.proceed();
+    }
+}
+```
+
+---
+
+### 14. How do you configure path‑based security without annotations (e.g., for static resources)?
+
+**Answer:**  
+You can use the built‑in HTTP security policies in `application.properties`:
+
+```properties
+quarkus.http.auth.policy.role-policy1.roles-allowed=admin
+quarkus.http.auth.permission.secure-admin.paths=/admin/*
+quarkus.http.auth.permission.secure-admin.policy=role-policy1
+```
+
+This is useful for securing static content or when you prefer configuration over annotations.
+
+---
+
+### 15. What are the roles available in `SecurityIdentity` after OIDC authentication?
+
+**Answer:**  
+The `SecurityIdentity` contains:
+- **Principal** – the authenticated user (usually from the `sub` claim).
+- **Roles** – a `Set<String>` derived from the mapped claims (e.g., `groups`, `realm_access.roles`).
+- **Credentials** – the original token (if needed).
+- **Attributes** – additional context that can be used by custom interceptors.
+
+You can inject it and call `identity.getRoles()` to see the list.
+
+---
+
+### 16. Does `@RolesAllowed` work on reactive (Uni/Multi) endpoints?
+
+**Answer:**  
+Yes. The security interceptor runs before the method is invoked and before the reactive pipeline is built. If the user lacks the role, the method is not called, and an `AccessDeniedException` (or 403) is returned immediately.
+
+```java
+@GET
+@Path("/reactive")
+@RolesAllowed("admin")
+public Uni<String> reactiveAdmin() {
+    return Uni.createFrom().item("admin data");
+}
+```
+
+The exception is automatically mapped to a 403 response by Quarkus.
+
+---
+
+### 17. How do you customize the 403 response when authorization fails?
+
+**Answer:**  
+Use an `ExceptionMapper` for `AccessDeniedException`:
+
+```java
+@Provider
+public class CustomAccessDeniedMapper implements ExceptionMapper<AccessDeniedException> {
+    @Override
+    public Response toResponse(AccessDeniedException exception) {
+        return Response.status(Response.Status.FORBIDDEN)
+                       .entity(new ErrorResponse("Insufficient permissions"))
+                       .build();
+    }
+}
+```
+
+---
+
+### 18. Can you mix `@RolesAllowed` with OIDC and Basic Auth simultaneously?
+
+**Answer:**  
+Yes, but you need to configure multiple authentication mechanisms. You can assign different security policies to different paths. For example, use OIDC for `/api/*` and Basic Auth for `/admin/*`. This is advanced and requires custom configuration using `HttpSecurityPolicy` or `SecurityInterceptor`.
+
+In practice, it's simpler to stick with a single authentication mechanism per application.
+
+---
+
+### 19. How do you handle roles that are not strings (e.g., numeric role IDs)?
+
+**Answer:**  
+If your token contains numeric role IDs, you need to map them to string role names. The easiest way is to create a `SecurityIdentityAugmenter` that reads the numeric IDs and adds corresponding string roles:
+
+```java
+List<Integer> roleIds = identity.getAttribute("role-ids");
+Set<String> roles = new HashSet<>();
+for (Integer id : roleIds) {
+    roles.add("role-" + id); // or map to names via a service
+}
+```
+
+---
+
+### 20. What is the recommended approach for role‑based security in Quarkus microservices?
+
+**Answer:**  
+The recommended approach:
+
+1. Use **OIDC** (`quarkus-oidc`) for authentication with a central provider (Keycloak, Auth0, etc.).
+2. Use `@RolesAllowed` on endpoints and services for declarative authorization.
+3. Configure `quarkus.oidc.roles.role-claim-path` to map provider‑specific role claims to the `groups` claim.
+4. Use `SecurityIdentity` for programmatic checks when needed.
+5. Set `quarkus.security.jaxrs.deny-unannotated-endpoints=true` to enforce explicit permissions.
+6. Write integration tests with `@TestSecurity` to validate role checks.
+7. Keep roles coarse‑grained (e.g., `admin`, `user`, `guest`) for simplicity, and use custom checks for fine‑grained authorization.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Details |
+| :--- | :--- |
+| **Annotations** | `@RolesAllowed`, `@PermitAll`, `@DenyAll` (Jakarta Security) |
+| **Role source** | JWT `groups` claim by default; map via `role-claim-path` |
+| **Programmatic** | `SecurityIdentity` (inject and check `hasRole()`) |
+| **Global defaults** | `quarkus.security.jaxrs.deny-unannotated-endpoints`, `default-roles-allowed` |
+| **Testing** | `@TestSecurity(user="alice", roles={"admin"})` |
+| **Service layer** | Works on any CDI bean (with proxy) |
+| **Custom role mapping** | `SecurityIdentityAugmenter` for hierarchy or mapping |
+| **Reactive** | Works with `Uni`/`Multi`; interceptor runs before method call |

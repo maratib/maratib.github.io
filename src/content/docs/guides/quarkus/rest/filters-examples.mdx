@@ -1,0 +1,1033 @@
+---
+title: Filters & Interceptors Examples  
+description: A guide on how to use Providers, Filters & Interceptors in Quarkus.
+date: 2026-08-01
+tags:
+  - quarkus
+  - provider
+  - filter
+  - interceptor
+sidebar:
+  order: 3
+---
+
+Here's a clean separation of **Filters** and **Interceptors** with their types:
+
+---
+
+## FILTERS (Work with Headers, URIs, Methods)
+
+Filters operate at the HTTP metadata level. They **cannot** modify the message body (the actual data payload).
+
+### Server-Side Filters
+
+| Type | Interface | When It Runs | What It Can Do |
+|------|-----------|--------------|----------------|
+| **Request Filter** | `ContainerRequestFilter` | Before the resource method executes | Read/modify headers, URI, method; abort request early |
+| **Response Filter** | `ContainerResponseFilter` | After the resource method executes, before response is sent | Read/modify response headers; modify status code |
+
+### Client-Side Filters
+
+| Type | Interface | When It Runs | What It Can Do |
+|------|-----------|--------------|----------------|
+| **Request Filter** | `ClientRequestFilter` | Before sending request to remote server | Modify headers, URI, method; abort the request |
+| **Response Filter** | `ClientResponseFilter` | After receiving response from remote server | Read/modify response headers; process response |
+
+### Simple Filter Examples
+
+```java
+// Server Request Filter - Authentication
+@Provider
+public class AuthFilter implements ContainerRequestFilter {
+    @Override
+    public void filter(ContainerRequestContext ctx) {
+        String token = ctx.getHeaderString("Authorization");
+        if (token == null) {
+            ctx.abortWith(Response.status(401).build()); // Abort early
+        }
+    }
+}
+
+// Server Response Filter - Add custom header
+@Provider
+public class HeaderFilter implements ContainerResponseFilter {
+    @Override
+    public void filter(ContainerRequestContext req, ContainerResponseContext res) {
+        res.getHeaders().add("X-Powered-By", "Quarkus");
+    }
+}
+
+// Client Request Filter - Add auth token
+@Provider
+public class ClientTokenFilter implements ClientRequestFilter {
+    @Override
+    public void filter(ClientRequestContext ctx) {
+        ctx.getHeaders().add("Authorization", "Bearer my-token");
+    }
+}
+```
+
+---
+
+## INTERCEPTORS (Work with Message Body/Streams)
+
+Interceptors operate at the entity stream level. They **can** read and modify the actual data being sent or received.
+
+### Server-Side Interceptors
+
+| Type | Interface | When It Runs | What It Can Do |
+|------|-----------|--------------|----------------|
+| **Reader Interceptor** | `ReaderInterceptor` | Around reading the request body | Read/modify the request entity stream before deserialization |
+| **Writer Interceptor** | `WriterInterceptor` | Around writing the response body | Modify the response entity stream before serialization |
+
+### Client-Side Interceptors
+
+| Type | Interface | When It Runs | What It Can Do |
+|------|-----------|--------------|----------------|
+| **Reader Interceptor** | `ReaderInterceptor` | Around reading the response body | Read/modify response entity stream after receiving |
+| **Writer Interceptor** | `WriterInterceptor` | Around writing the request body | Modify request entity stream before sending |
+
+### Simple Interceptor Examples
+
+```java
+// Server Writer Interceptor - Compress response body
+@Provider
+public class CompressionInterceptor implements WriterInterceptor {
+    @Override
+    public void aroundWriteTo(WriterInterceptorContext context) 
+            throws IOException, WebApplicationException {
+        // Get the output stream
+        OutputStream output = context.getOutputStream();
+        
+        // Wrap it with compression
+        GZIPOutputStream gzipOutput = new GZIPOutputStream(output);
+        context.setOutputStream(gzipOutput);
+        
+        // Add compression header
+        context.getHeaders().add("Content-Encoding", "gzip");
+        
+        // Proceed with writing
+        context.proceed();
+    }
+}
+
+// Server Reader Interceptor - Log request body
+@Provider
+public class LoggingReaderInterceptor implements ReaderInterceptor {
+    @Override
+    public Object aroundReadFrom(ReaderInterceptorContext context) 
+            throws IOException, WebApplicationException {
+        // Read the input stream
+        InputStream input = context.getInputStream();
+        String body = new String(input.readAllBytes());
+        System.out.println("Request body: " + body);
+        
+        // Reset the stream for actual processing
+        context.setInputStream(new ByteArrayInputStream(body.getBytes()));
+        
+        // Proceed with reading
+        return context.proceed();
+    }
+}
+```
+
+---
+
+## Summary Comparison
+
+| Aspect | Filters | Interceptors |
+|--------|---------|--------------|
+| **Work With** | Headers, URI, Method | Message body (data stream) |
+| **Can Abort Request** | ✅ Yes | ❌ No |
+| **Can Modify Body** | ❌ No | ✅ Yes |
+| **Run At** | Before/after resource method | During read/write of body |
+| **Common Uses** | Auth, logging, CORS, rate limiting | Compression, encryption, logging payloads |
+
+---
+
+## Bonus: Dynamic Filter Registration
+
+You can also use `DynamicFeature` to conditionally apply filters to specific endpoints:
+
+```java
+@Provider
+public class MyDynamicFeature implements DynamicFeature {
+    @Override
+    public void configure(ResourceInfo resourceInfo, FeatureContext context) {
+        // Only apply logging filter to methods with @Log annotation
+        if (resourceInfo.getResourceMethod().isAnnotationPresent(Log.class)) {
+            context.register(new LoggingFilter());
+        }
+    }
+}
+```
+
+---
+
+## Key Takeaway
+- **Filter** = "I care about the envelope" (headers, metadata)
+- **Interceptor** = "I care about the letter inside" (the actual data)
+
+---
+
+## Here's a **real-world scenario** combining both Filters and Interceptors in a single Quarkus application:
+
+### The Scenario: Secure API with Logging & Encryption
+
+Imagine you're building an API that:
+- **Authenticates** users via API keys (Filter)
+- **Logs** all requests and responses (Filter)
+- **Encrypts** sensitive request/response data (Interceptor)
+- **Compresses** large responses (Interceptor)
+
+---
+
+## Complete Example
+
+### 1. The Resource Endpoint
+
+```java
+package com.example.resource;
+
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+@Path("/api/users")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class UserResource {
+
+    @POST
+    @Path("/create")
+    public Response createUser(User user) {
+        System.out.println(">>> Creating user: " + user.getName());
+        
+        // Simulate saving to database
+        user.setId(123L);
+        
+        return Response.status(201)
+                .entity(user)
+                .build();
+    }
+
+    @GET
+    @Path("/{id}")
+    public Response getUser(@PathParam("id") Long id) {
+        System.out.println(">>> Getting user with ID: " + id);
+        
+        // Simulate fetching from database
+        User user = new User(id, "John Doe", "john@example.com");
+        
+        return Response.ok(user).build();
+    }
+}
+
+// Simple POJO
+class User {
+    private Long id;
+    private String name;
+    private String email;
+
+    public User() {}
+    public User(Long id, String name, String email) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+    
+    // Getters and setters...
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+}
+```
+
+---
+
+### 2. FILTERS (Working with Headers)
+
+#### Authentication Filter - Checks API Key
+
+```java
+package com.example.filter;
+
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.Provider;
+import java.io.IOException;
+
+@Provider
+public class AuthenticationFilter implements ContainerRequestFilter {
+
+    private static final String VALID_API_KEY = "secret-api-key-123";
+
+    @Override
+    public void filter(ContainerRequestContext requestContext) throws IOException {
+        // Check if it's a public endpoint (skip auth for health checks)
+        String path = requestContext.getUriInfo().getPath();
+        if (path.equals("/health")) {
+            return; // Skip authentication
+        }
+
+        // Get API key from header
+        String apiKey = requestContext.getHeaderString("X-API-Key");
+        
+        if (apiKey == null || !apiKey.equals(VALID_API_KEY)) {
+            // Abort the request - this prevents resource method from executing
+            requestContext.abortWith(
+                Response.status(401)
+                    .header("WWW-Authenticate", "API-Key")
+                    .entity("{\"error\": \"Invalid or missing API Key\"}")
+                    .build()
+            );
+        }
+        
+        System.out.println("✅ Authentication passed");
+    }
+}
+```
+
+#### Logging Filter - Logs request and response
+
+```java
+package com.example.filter;
+
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.ext.Provider;
+import java.io.IOException;
+
+@Provider
+public class LoggingFilter implements ContainerRequestFilter, ContainerResponseFilter {
+
+    @Override
+    public void filter(ContainerRequestContext requestContext) throws IOException {
+        System.out.println("=" .repeat(50));
+        System.out.println("📤 REQUEST:");
+        System.out.println("   Method: " + requestContext.getMethod());
+        System.out.println("   URI: " + requestContext.getUriInfo().getRequestUri());
+        System.out.println("   Headers: " + requestContext.getHeaders());
+    }
+
+    @Override
+    public void filter(ContainerRequestContext requestContext, 
+                       ContainerResponseContext responseContext) throws IOException {
+        System.out.println("📥 RESPONSE:");
+        System.out.println("   Status: " + responseContext.getStatus());
+        System.out.println("   Headers: " + responseContext.getHeaders());
+        System.out.println("=" .repeat(50));
+    }
+}
+```
+
+#### CORS Filter - Adds CORS headers
+
+```java
+package com.example.filter;
+
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.ext.Provider;
+import java.io.IOException;
+
+@Provider
+public class CORSFilter implements ContainerResponseFilter {
+
+    @Override
+    public void filter(ContainerRequestContext request, 
+                       ContainerResponseContext response) throws IOException {
+        response.getHeaders().add("Access-Control-Allow-Origin", "*");
+        response.getHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+        response.getHeaders().add("Access-Control-Allow-Headers", "X-API-Key, Content-Type");
+    }
+}
+```
+
+---
+
+### 3. INTERCEPTORS (Working with Data/Body)
+
+#### Encryption Interceptor - Encrypts/Decrypts data
+
+```java
+package com.example.interceptor;
+
+import jakarta.ws.rs.ext.Provider;
+import jakarta.ws.rs.ext.ReaderInterceptor;
+import jakarta.ws.rs.ext.ReaderInterceptorContext;
+import jakarta.ws.rs.ext.WriterInterceptor;
+import jakarta.ws.rs.ext.WriterInterceptorContext;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
+@Provider
+public class EncryptionInterceptor implements ReaderInterceptor, WriterInterceptor {
+
+    private static final String SECRET_KEY = "simple-key-123"; // In real app, use proper encryption
+
+    @Override
+    public Object aroundReadFrom(ReaderInterceptorContext context) 
+            throws IOException {
+        System.out.println("🔓 Decrypting request body...");
+
+        // Read the encrypted body
+        InputStream input = context.getInputStream();
+        String encrypted = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        
+        // Simple "decryption" (Base64 decode + reverse for demo)
+        String decrypted = decrypt(encrypted);
+        System.out.println("   Decrypted: " + decrypted);
+        
+        // Replace the input stream with decrypted data
+        context.setInputStream(
+            new ByteArrayInputStream(decrypted.getBytes(StandardCharsets.UTF_8))
+        );
+        
+        return context.proceed();
+    }
+
+    @Override
+    public void aroundWriteTo(WriterInterceptorContext context) 
+            throws IOException {
+        System.out.println("🔐 Encrypting response body...");
+        
+        // Get the output stream
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        context.setOutputStream(baos);
+        
+        // Let the normal writing happen
+        context.proceed();
+        
+        // Get the written data and encrypt it
+        String response = baos.toString(StandardCharsets.UTF_8);
+        String encrypted = encrypt(response);
+        System.out.println("   Original: " + response);
+        System.out.println("   Encrypted: " + encrypted);
+        
+        // Write encrypted data to real output stream
+        context.getOutputStream().write(encrypted.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String encrypt(String data) {
+        // Simple demo: Base64 encode + reverse
+        String reversed = new StringBuilder(data).reverse().toString();
+        return Base64.getEncoder().encodeToString(reversed.getBytes());
+    }
+
+    private String decrypt(String data) {
+        // Simple demo: Base64 decode + reverse
+        String decoded = new String(Base64.getDecoder().decode(data));
+        return new StringBuilder(decoded).reverse().toString();
+    }
+}
+```
+
+#### Compression Interceptor - Compresses large responses
+
+```java
+package com.example.interceptor;
+
+import jakarta.ws.rs.ext.Provider;
+import jakarta.ws.rs.ext.WriterInterceptor;
+import jakarta.ws.rs.ext.WriterInterceptorContext;
+import java.io.IOException;
+import java.util.zip.GZIPOutputStream;
+
+@Provider
+public class CompressionInterceptor implements WriterInterceptor {
+
+    @Override
+    public void aroundWriteTo(WriterInterceptorContext context) 
+            throws IOException {
+        System.out.println("🗜️ Compressing response...");
+
+        // Only compress large responses (size > 1024 bytes)
+        // In real implementation, you'd check content length
+        
+        // Wrap output stream with GZIP compression
+        GZIPOutputStream gzipOutput = new GZIPOutputStream(context.getOutputStream());
+        context.setOutputStream(gzipOutput);
+        
+        // Add encoding header
+        context.getHeaders().add("Content-Encoding", "gzip");
+        
+        // Proceed with writing
+        context.proceed();
+        
+        // Finish compression
+        gzipOutput.finish();
+    }
+}
+```
+
+---
+
+### 4. Testing the Complete Flow
+
+#### Test Request (using cURL or Postman)
+
+```bash
+# Send a request with API key and encrypted data
+curl -X POST http://localhost:8080/api/users/create \
+  -H "X-API-Key: secret-api-key-123" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Alice","email":"alice@example.com"}'
+```
+
+#### Console Output (What happens in order)
+
+```
+==================================================
+📤 REQUEST:
+   Method: POST
+   URI: http://localhost:8080/api/users/create
+   Headers: {X-API-Key=[secret-api-key-123], Content-Type=[application/json]}
+
+✅ Authentication passed
+
+🔓 Decrypting request body...
+   Decrypted: {"name":"Alice","email":"alice@example.com"}
+
+>>> Creating user: Alice
+
+🔐 Encrypting response body...
+   Original: {"id":123,"name":"Alice","email":"alice@example.com"}
+   Encrypted: bW9jLmVsYW1wbGVAaW1leGFjZS5jb20iLCJuYW1lIjoiQWxpY2UiLCJpZCI6MTIzfQ==
+
+🗜️ Compressing response...
+
+📥 RESPONSE:
+   Status: 201
+   Headers: {Access-Control-Allow-Origin=[*], Content-Encoding=[gzip], ...}
+==================================================
+```
+
+---
+
+## The Complete Flow Diagram
+
+```
+HTTP Request (Raw JSON)
+        ↓
+[Filter: Authentication] → Checks X-API-Key header
+        ↓
+[Filter: Logging] → Logs request details
+        ↓
+[Interceptor: Encryption] → Decrypts the request body
+        ↓
+[Resource Method] → Creates user (business logic)
+        ↓
+[Interceptor: Encryption] → Encrypts the response body
+        ↓
+[Interceptor: Compression] → Compresses the encrypted data
+        ↓
+[Filter: CORS] → Adds CORS headers
+        ↓
+[Filter: Logging] → Logs response details
+        ↓
+HTTP Response (Compressed, Encrypted JSON)
+```
+
+---
+
+## Key Points to Remember
+
+| Component | What It Does | Order |
+|-----------|--------------|-------|
+| **Authentication Filter** | Validates API key | 1️⃣ First |
+| **Logging Filter (Request)** | Logs incoming request | 2️⃣ Second |
+| **Encryption Interceptor** | Decrypts request body | 3️⃣ Third |
+| **Resource Method** | Business logic | 4️⃣ Fourth |
+| **Encryption Interceptor** | Encrypts response body | 5️⃣ Fifth |
+| **Compression Interceptor** | Compresses response | 6️⃣ Sixth |
+| **CORS Filter** | Adds CORS headers | 7️⃣ Seventh |
+| **Logging Filter (Response)** | Logs outgoing response | 8️⃣ Eighth |
+
+---
+
+## Client-Side Example (Calling External API)
+
+```java
+package com.example.client;
+
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestProvider;
+
+@Path("/external/api")
+@RegisterRestProvider(ClientAuthFilter.class)    // Filter
+@RegisterRestProvider(ClientEncryptionInterceptor.class)  // Interceptor
+public interface ExternalServiceClient {
+
+    @POST
+    @Path("/data")
+    String sendData(String encryptedData);
+}
+
+// Client Authentication Filter
+@Provider
+public class ClientAuthFilter implements ClientRequestFilter {
+    @Override
+    public void filter(ClientRequestContext ctx) {
+        ctx.getHeaders().add("X-API-Key", "client-secret-key");
+    }
+}
+
+// Client Encryption Interceptor
+@Provider
+public class ClientEncryptionInterceptor implements WriterInterceptor {
+    @Override
+    public void aroundWriteTo(WriterInterceptorContext ctx) throws IOException {
+        // Encrypt data before sending to external API
+        // Similar to server version...
+        ctx.proceed();
+    }
+}
+```
+
+---
+
+This example shows how Filters and Interceptors work together in a real Quarkus application. **Filters** handle headers/metadata (auth, logging, CORS), while **Interceptors** handle the actual data (encryption, compression).
+
+---
+
+Absolutely! Controlling the **execution order** is crucial when you have multiple filters and interceptors. Let me show you how to control the order using `@Priority` annotations.
+
+---
+
+## Understanding Priority in Quarkus/Jakarta REST
+
+### How Priority Works
+
+| Priority Value | When It Runs | Execution Order |
+|---------------|--------------|-----------------|
+| **Lower number** | Runs EARLIER | For request filters: **Smallest → Largest** |
+| **Higher number** | Runs LATER | For response filters: **Largest → Smallest** (reverse) |
+
+**Key Rule:**
+- **Request Filters**: Execute in **ascending** priority order (1 → 100 → 1000)
+- **Response Filters**: Execute in **descending** priority order (1000 → 100 → 1)
+- **Interceptors**: Execute in **ascending** priority order (1 → 100 → 1000)
+
+---
+
+## Complete Priority Example
+
+Let's assign priorities to our previous example:
+
+```java
+package com.example.filter;
+
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.ext.Provider;
+import jakarta.annotation.Priority;
+import java.io.IOException;
+
+// PRIORITY = 1 (HIGHEST - Runs FIRST for Request, LAST for Response)
+@Provider
+@Priority(1)
+public class AuthenticationFilter implements ContainerRequestFilter, ContainerResponseFilter {
+
+    @Override
+    public void filter(ContainerRequestContext requestContext) throws IOException {
+        System.out.println("🔥 [Priority 1] Authentication Filter - REQUEST (First)");
+        // Auth logic...
+    }
+
+    @Override
+    public void filter(ContainerRequestContext requestContext, 
+                       ContainerResponseContext responseContext) throws IOException {
+        System.out.println("🔥 [Priority 1] Authentication Filter - RESPONSE (Last)");
+        // Auth cleanup...
+    }
+}
+```
+
+```java
+package com.example.filter;
+
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.ext.Provider;
+import jakarta.annotation.Priority;
+import java.io.IOException;
+
+// PRIORITY = 100 (MEDIUM)
+@Provider
+@Priority(100)
+public class LoggingFilter implements ContainerRequestFilter, ContainerResponseFilter {
+
+    @Override
+    public void filter(ContainerRequestContext requestContext) throws IOException {
+        System.out.println("📝 [Priority 100] Logging Filter - REQUEST (Middle)");
+        // Logging logic...
+    }
+
+    @Override
+    public void filter(ContainerRequestContext requestContext, 
+                       ContainerResponseContext responseContext) throws IOException {
+        System.out.println("📝 [Priority 100] Logging Filter - RESPONSE (Middle)");
+        // Logging logic...
+    }
+}
+```
+
+```java
+package com.example.filter;
+
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.ext.Provider;
+import jakarta.annotation.Priority;
+import java.io.IOException;
+
+// PRIORITY = 1000 (LOWEST - Runs LAST for Request, FIRST for Response)
+@Provider
+@Priority(1000)
+public class CORSFilter implements ContainerResponseFilter {
+
+    @Override
+    public void filter(ContainerRequestContext request, 
+                       ContainerResponseContext response) throws IOException {
+        System.out.println("🌐 [Priority 1000] CORS Filter - RESPONSE (First)");
+        response.getHeaders().add("Access-Control-Allow-Origin", "*");
+    }
+}
+```
+
+```java
+package com.example.interceptor;
+
+import jakarta.ws.rs.ext.Provider;
+import jakarta.ws.rs.ext.ReaderInterceptor;
+import jakarta.ws.rs.ext.ReaderInterceptorContext;
+import jakarta.ws.rs.ext.WriterInterceptor;
+import jakarta.ws.rs.ext.WriterInterceptorContext;
+import jakarta.annotation.Priority;
+import java.io.*;
+
+// PRIORITY = 50 (Runs before Logging, after Auth)
+@Provider
+@Priority(50)
+public class EncryptionInterceptor implements ReaderInterceptor, WriterInterceptor {
+
+    @Override
+    public Object aroundReadFrom(ReaderInterceptorContext context) throws IOException {
+        System.out.println("🔓 [Priority 50] Encryption Interceptor - REQUEST (After Auth, Before Logging)");
+        // Decryption logic...
+        return context.proceed();
+    }
+
+    @Override
+    public void aroundWriteTo(WriterInterceptorContext context) throws IOException {
+        System.out.println("🔐 [Priority 50] Encryption Interceptor - RESPONSE (After Logging, Before CORS)");
+        // Encryption logic...
+        context.proceed();
+    }
+}
+```
+
+---
+
+## Execution Order Visualization
+
+### 🟢 REQUEST PHASE (Incoming)
+
+```
+HTTP Request
+    ↓
+┌─────────────────────────────────────────────────────────────┐
+│ REQUEST FILTERS (Ascending Priority: Smallest → Largest)    │
+├─────────────────────────────────────────────────────────────┤
+│ 1️⃣ [Priority 1]   Authentication Filter  ← FIRST          │
+│ 2️⃣ [Priority 50]  Encryption Interceptor                   │
+│ 3️⃣ [Priority 100] Logging Filter                          │
+│ 4️⃣ [Priority 1000] CORS Filter (doesn't run on request)   │
+└─────────────────────────────────────────────────────────────┘
+    ↓
+Resource Method (Business Logic)
+    ↓
+```
+
+### 🔴 RESPONSE PHASE (Outgoing)
+
+```
+Resource Method returns response
+    ↓
+┌─────────────────────────────────────────────────────────────┐
+│ RESPONSE FILTERS (Descending Priority: Largest → Smallest)  │
+├─────────────────────────────────────────────────────────────┤
+│ 1️⃣ [Priority 1000] CORS Filter  ← FIRST                   │
+│ 2️⃣ [Priority 100]  Logging Filter                         │
+│ 3️⃣ [Priority 50]   Encryption Interceptor                 │
+│ 4️⃣ [Priority 1]    Authentication Filter  ← LAST          │
+└─────────────────────────────────────────────────────────────┘
+    ↓
+HTTP Response
+```
+
+### 🔄 COMPLETE FLOW
+
+```
+REQUEST SIDE (Priority: Low → High)
+───────────────────────────────────────────────────────────
+1️⃣ [PRIORITY 1]   🔥 Authentication Filter     → Checks API Key
+2️⃣ [PRIORITY 50]  🔓 Encryption Interceptor    → Decrypts body
+3️⃣ [PRIORITY 100] 📝 Logging Filter            → Logs request
+4️⃣ [PRIORITY 1000] (No Request Filter)         
+
+💼 BUSINESS LOGIC (Resource Method executes)
+   → Creates user, fetches data, etc.
+
+RESPONSE SIDE (Priority: High → Low)
+───────────────────────────────────────────────────────────
+5️⃣ [PRIORITY 1000] 🌐 CORS Filter              → Adds CORS headers
+6️⃣ [PRIORITY 100]  📝 Logging Filter            → Logs response
+7️⃣ [PRIORITY 50]   🔐 Encryption Interceptor    → Encrypts body
+8️⃣ [PRIORITY 1]    🔥 Authentication Filter     → Auth cleanup
+───────────────────────────────────────────────────────────
+```
+
+---
+
+## Console Output with Priorities
+
+When you make a request, you'll see this output:
+
+```
+🟢 REQUEST PHASE:
+🔥 [Priority 1] Authentication Filter - REQUEST (First)
+🔓 [Priority 50] Encryption Interceptor - REQUEST (After Auth, Before Logging)
+📝 [Priority 100] Logging Filter - REQUEST (Middle)
+
+💼 Resource Method: Creating user...
+
+🔴 RESPONSE PHASE:
+🌐 [Priority 1000] CORS Filter - RESPONSE (First)
+📝 [Priority 100] Logging Filter - RESPONSE (Middle)
+🔐 [Priority 50] Encryption Interceptor - RESPONSE (After Logging, Before CORS)
+🔥 [Priority 1] Authentication Filter - RESPONSE (Last)
+```
+
+---
+
+## Standard Priority Constants
+
+Jakarta REST provides constants for common priorities:
+
+```java
+import jakarta.ws.rs.Priorities;
+
+@Provider
+@Priority(Priorities.AUTHENTICATION)  // = 1000
+public class AuthFilter { }
+
+@Provider
+@Priority(Priorities.AUTHORIZATION)   // = 2000
+public class AuthzFilter { }
+
+@Provider
+@Priority(Priorities.HEADER_DECORATOR) // = 3000
+public class HeaderFilter { }
+
+@Provider
+@Priority(Priorities.ENTITY_CODER)    // = 4000
+public class CompressionInterceptor { }
+
+@Provider
+@Priority(Priorities.USER)            // = 5000
+public class LoggingFilter { }
+
+@Provider
+@Priority(Priorities.VALIDATION)      // = 6000
+public class ValidationFilter { }
+```
+
+### Priority Values Reference
+
+| Constant | Value | Typical Use |
+|----------|-------|-------------|
+| `Priorities.AUTHENTICATION` | 1000 | Authentication filters |
+| `Priorities.AUTHORIZATION` | 2000 | Authorization/role checks |
+| `Priorities.HEADER_DECORATOR` | 3000 | Adding/modifying headers |
+| `Priorities.ENTITY_CODER` | 4000 | Encryption/decryption, compression |
+| `Priorities.USER` | 5000 | Custom business logic, logging |
+| `Priorities.VALIDATION` | 6000 | Request/response validation |
+
+---
+
+## Dynamic Priority with @NameBinding
+
+You can create custom annotations to apply specific priorities to specific endpoints:
+
+### 1. Create Custom Annotations
+
+```java
+package com.example.annotation;
+
+import jakarta.ws.rs.NameBinding;
+import java.lang.annotation.*;
+
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface Secured { }
+
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface Logged { }
+```
+
+### 2. Apply Annotations to Filters
+
+```java
+@Provider
+@Secured  // Only applies to endpoints with @Secured
+@Priority(Priorities.AUTHENTICATION)
+public class SecurityFilter implements ContainerRequestFilter {
+    // Auth logic...
+}
+
+@Provider
+@Logged  // Only applies to endpoints with @Logged
+@Priority(Priorities.USER)
+public class DetailedLoggingFilter implements ContainerRequestFilter {
+    // Detailed logging...
+}
+```
+
+### 3. Use Annotations on Resource Methods
+
+```java
+@Path("/api/users")
+public class UserResource {
+
+    @POST
+    @Secured        // SecurityFilter runs
+    @Logged         // DetailedLoggingFilter runs
+    public Response createUser(User user) { 
+        // Only authenticated, logged requests
+    }
+
+    @GET
+    @Logged         // Only logging filter runs (no auth needed)
+    public Response getUsers() {
+        // Public endpoint, just logging
+    }
+
+    @GET
+    @Path("/public")
+    public Response publicInfo() {
+        // No filters apply (completely public)
+    }
+}
+```
+
+---
+
+## Priority Rules Summary
+
+| Rule | Explanation |
+|------|-------------|
+| **Request Filters** | Execute in **ascending** priority (1 → 1000) |
+| **Response Filters** | Execute in **descending** priority (1000 → 1) |
+| **Interceptors (Reader)** | Execute in **ascending** priority (1 → 1000) |
+| **Interceptors (Writer)** | Execute in **ascending** priority (1 → 1000) |
+| **Global vs Named** | Global (@Provider) runs before named (@NameBinding) |
+| **Same Priority** | Order is undefined (avoid having same priority) |
+
+---
+
+## Best Practices
+
+1. **Use Standard Constants** when possible for readability
+   ```java
+   @Priority(Priorities.AUTHENTICATION)  // ✅ Good
+   @Priority(1000)                       // ✅ Also fine but less clear
+   @Priority(5)                          // ⚠️ Avoid - too low
+   ```
+
+2. **Leave Gaps** in your priorities for flexibility
+   ```java
+   @Priority(100)   // Authentication
+   @Priority(300)   // Authorization  (gap for future interceptors)
+   @Priority(500)   // Logging
+   ```
+
+3. **Group Related Functionality**
+   ```java
+   // Security group: 1000-1999
+   @Priority(1000) // AuthN
+   @Priority(1100) // AuthZ
+   
+   // Data processing: 2000-2999
+   @Priority(2000) // Decryption
+   @Priority(2100) // Validation
+   
+   // Logging: 3000-3999
+   @Priority(3000) // Request Logging
+   @Priority(3100) // Response Logging
+   ```
+
+---
+
+## Complete Working Example
+
+Here's a fully functional example with all priorities:
+
+```java
+@ApplicationScoped
+@Path("/test")
+public class TestResource {
+    
+    @GET
+    public String test() {
+        System.out.println("💼 RESOURCE METHOD: Executing business logic");
+        return "Hello World!";
+    }
+}
+
+@Provider
+@Priority(1)
+public class FilterA implements ContainerRequestFilter {
+    @Override
+    public void filter(ContainerRequestContext ctx) {
+        System.out.println("1️⃣ FilterA - Request (First)");
+    }
+}
+
+@Provider
+@Priority(2)
+public class FilterB implements ContainerRequestFilter {
+    @Override
+    public void filter(ContainerRequestContext ctx) {
+        System.out.println("2️⃣ FilterB - Request (Second)");
+    }
+}
+
+// ... etc
+```
+
+**Output when calling `/test`:**
+```
+1️⃣ FilterA - Request (First)
+2️⃣ FilterB - Request (Second)
+💼 RESOURCE METHOD: Executing business logic
+```
+

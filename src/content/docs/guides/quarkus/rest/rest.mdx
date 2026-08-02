@@ -1,0 +1,365 @@
+---
+title: REST Api and Validation
+description: Guides on building REST APIs with Quarkus JAX-RS, filters, interceptors, and providers.
+sidebar:
+  order: 1
+  label: REST Api - Validation
+---
+
+### 1. What is Jakarta Bean Validation and how does it integrate with Quarkus REST APIs?
+
+**Answer:** Jakarta Bean Validation (formerly Java Bean Validation) is a Java specification that provides a declarative way to validate objects using annotations. In Quarkus, it integrates seamlessly with REST endpoints via Hibernate Validator (the reference implementation). When you annotate a REST endpoint parameter or request body with `@Valid`, Quarkus automatically triggers validation before the method is invoked. If validation fails, it automatically returns a **400 Bad Request** (or `ConstraintViolationException` mapped to a suitable response).
+
+---
+
+### 2. What are the most commonly used validation annotations?
+
+**Answer:**
+
+| Annotation | Purpose |
+| :--- | :--- |
+| `@NotNull` | Value must not be null |
+| `@NotBlank` | String must not be null and must contain at least one non‑whitespace character |
+| `@NotEmpty` | Collection/map/array/string must not be null and must have at least one element |
+| `@Size(min, max)` | String length or collection size must be within bounds |
+| `@Min(value)` | Number must be ≥ value |
+| `@Max(value)` | Number must be ≤ value |
+| `@DecimalMin(value)` | Decimal number must be ≥ value |
+| `@DecimalMax(value)` | Decimal number must be ≤ value |
+| `@Email` | String must be a valid email address |
+| `@Pattern(regexp)` | String must match a regular expression |
+| `@Past` | Date must be in the past |
+| `@Future` | Date must be in the future |
+| `@Positive` / `@PositiveOrZero` | Number must be positive or zero |
+| `@Negative` / `@NegativeOrZero` | Number must be negative or zero |
+| `@AssertTrue` / `@AssertFalse` | Boolean must be true/false |
+
+---
+
+### 3. How do you validate a request body in a REST endpoint?
+
+**Answer:** Use `@Valid` on the request body parameter:
+
+```java
+@POST
+@Path("/users")
+@Consumes(MediaType.APPLICATION_JSON)
+public Response createUser(@Valid User user) {
+    // If validation fails, Quarkus returns 400 automatically
+    userService.save(user);
+    return Response.status(201).build();
+}
+
+public class User {
+    @NotBlank(message = "Name is required")
+    @Size(min = 2, max = 50)
+    public String name;
+
+    @Email(message = "Invalid email format")
+    @NotBlank(message = "Email is required")
+    public String email;
+
+    @Min(18)
+    @Max(120)
+    public Integer age;
+}
+```
+
+---
+
+### 4. How do you validate path parameters, query parameters, and headers?
+
+**Answer:** Use validation annotations directly on the method parameters and `@Valid` is not required for these.
+
+```java
+@GET
+@Path("/users/{id}")
+public User getUser(
+    @PathParam("id") @Min(1) Long id,
+    @QueryParam("page") @Min(0) @DefaultValue("0") int page,
+    @QueryParam("size") @Min(1) @Max(100) @DefaultValue("20") int size,
+    @HeaderParam("X-API-Key") @NotBlank String apiKey
+) {
+    // Validation runs automatically before method execution
+    return userService.findById(id, page, size);
+}
+```
+
+If validation fails, Quarkus returns a **400 Bad Request**.
+
+---
+
+### 5. How do you customize the error response when validation fails?
+
+**Answer:** You can handle `ConstraintViolationException` globally using an `ExceptionMapper`:
+
+```java
+@Provider
+public class ValidationExceptionMapper implements ExceptionMapper<ConstraintViolationException> {
+    @Override
+    public Response toResponse(ConstraintViolationException exception) {
+        Map<String, List<String>> errors = exception.getConstraintViolations().stream()
+            .collect(Collectors.groupingBy(
+                violation -> violation.getPropertyPath().toString(),
+                Collectors.mapping(ConstraintViolation::getMessage, Collectors.toList())
+            ));
+
+        return Response.status(Response.Status.BAD_REQUEST)
+                       .entity(new ErrorResponse("Validation failed", errors))
+                       .type(MediaType.APPLICATION_JSON)
+                       .build();
+    }
+}
+```
+
+Alternatively, in Quarkus 3.9+, you can use `@ServerExceptionMapper`:
+
+```java
+@ServerExceptionMapper
+public Response handleConstraintViolation(ConstraintViolationException ex) {
+    // custom response logic
+}
+```
+
+---
+
+### 6. How do you validate nested objects (objects inside objects)?
+
+**Answer:** Use `@Valid` on the nested field:
+
+```java
+public class User {
+    @Valid
+    public Address address;
+}
+
+public class Address {
+    @NotBlank
+    public String street;
+    @NotBlank
+    public String city;
+}
+```
+
+When validating `User`, Quarkus recursively validates `Address`.
+
+---
+
+### 7. How do you validate lists of objects?
+
+**Answer:** Annotate the list parameter with `@Valid`:
+
+```java
+@POST
+@Path("/batch")
+public Response createUsers(@Valid List<User> users) {
+    // Each User in the list is validated
+    userService.saveAll(users);
+    return Response.ok().build();
+}
+```
+
+**⚠️ Important:** In Quarkus 3.x, due to type erasure, the generic type information is sometimes lost. To ensure validation works for `List<User>`, you may need to wrap it in a container class or use `@Valid` on the method parameter with proper generic configuration.
+
+---
+
+### 8. How do you perform group validation (different validation rules for different use cases)?
+
+**Answer:** Use `@Validated` (from Spring) is not available in Quarkus. Instead, use `@ConvertGroup` or define validation groups:
+
+```java
+public interface CreateGroup {}
+public interface UpdateGroup {}
+
+public class User {
+    @NotBlank(groups = CreateGroup.class)
+    @Size(min = 2, max = 50, groups = {CreateGroup.class, UpdateGroup.class})
+    public String name;
+
+    @NotNull(groups = CreateGroup.class)
+    @Min(value = 18, groups = CreateGroup.class)
+    public Integer age;
+}
+
+// In REST endpoint
+@POST
+public Response create(@Valid @ConvertGroup(to = CreateGroup.class) User user) { ... }
+
+@PUT
+public Response update(@Valid @ConvertGroup(to = UpdateGroup.class) User user) { ... }
+```
+
+**⚠️ Note:** `@ConvertGroup` is available but may require additional setup in Quarkus. An alternative is to use different DTOs for each use case (recommended).
+
+---
+
+### 9. How do you create custom validation annotations?
+
+**Answer:** 
+1. Create the annotation:
+```java
+@Target({FIELD, PARAMETER})
+@Retention(RUNTIME)
+@Constraint(validatedBy = PhoneNumberValidator.class)
+public @interface ValidPhoneNumber {
+    String message() default "Invalid phone number";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+```
+
+2. Implement the validator:
+```java
+public class PhoneNumberValidator implements ConstraintValidator<ValidPhoneNumber, String> {
+    private static final Pattern PATTERN = Pattern.compile("^\\+?[1-9]\\d{1,14}$");
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        if (value == null) return true; // Use @NotBlank for null checks
+        return PATTERN.matcher(value).matches();
+    }
+}
+```
+
+3. Use it:
+```java
+@ValidPhoneNumber
+public String phone;
+```
+
+---
+
+### 10. How do you perform cross-field validation (e.g., start date must be before end date)?
+
+**Answer:** Use a class-level custom validator:
+
+```java
+@ValidDateRange
+public class Event {
+    public LocalDate startDate;
+    public LocalDate endDate;
+}
+
+// Custom validator
+public class DateRangeValidator implements ConstraintValidator<ValidDateRange, Event> {
+    @Override
+    public boolean isValid(Event event, ConstraintValidatorContext context) {
+        if (event.startDate == null || event.endDate == null) return true;
+        return event.startDate.isBefore(event.endDate);
+    }
+}
+```
+
+---
+
+### 11. How do you validate in reactive REST endpoints that return `Uni`/`Multi`?
+
+**Answer:** Validation works the same way – it runs **before** the method is invoked. However, if the validation logic itself is asynchronous (e.g., checking a database), you need to use a custom validator that returns a `Uni`:
+
+```java
+@ApplicationScoped
+public class UniqueEmailValidator implements ConstraintValidator<UniqueEmail, String> {
+    @Inject
+    UserRepository repository;
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        // This is synchronous – if you need async, use a different approach
+        return repository.findByEmail(value).await().indefinitely() == null;
+    }
+}
+```
+
+**⚠️ Warning:** Blocking inside a validator that runs on the event loop is risky. For async validation, use a service-level check instead of a custom validator.
+
+---
+
+### 12. How do you test validation in Quarkus?
+
+**Answer:** Use `@QuarkusTest` with RestAssured:
+
+```java
+@QuarkusTest
+public class UserValidationTest {
+    @Test
+    public void testValidationFails() {
+        User invalidUser = new User();
+        invalidUser.name = "";
+        invalidUser.email = "not-an-email";
+
+        given()
+            .contentType(ContentType.JSON)
+            .body(invalidUser)
+            .when().post("/api/users")
+            .then()
+            .statusCode(400)
+            .body("errors.name", hasItem("Name is required"));
+    }
+}
+```
+
+---
+
+### 13. What are the common pitfalls with validation in Quarkus?
+
+**Answer:**
+
+- **Forgetting `@Valid`** – The most common mistake. Without it, validation doesn't run.
+- **Incorrect `@Valid` placement** – For nested objects or lists, `@Valid` must be on the field, not just the class.
+- **Blocking in validators** – Custom validators that hit the database block the event loop. Use service-level checks instead.
+- **Not customizing error responses** – The default error response is ugly. Always provide a custom `ExceptionMapper` for `ConstraintViolationException`.
+- **Using `@Validated` (Spring)** – This annotation is not supported; use Jakarta's `@Valid` instead.
+- **Type erasure with generic collections** – Validation of `List<User>` may not work as expected in some Quarkus versions. Consider using a wrapper class or DTO.
+
+---
+
+### 14. What is the difference between `@NotNull`, `@NotEmpty`, and `@NotBlank`?
+
+| Annotation | Null check | Empty check | Whitespace check |
+| :--- | :--- | :--- | :--- |
+| `@NotNull` | ✅ | ❌ | ❌ |
+| `@NotEmpty` | ✅ | ✅ (size > 0) | ❌ |
+| `@NotBlank` | ✅ | ✅ | ✅ (trimmed length > 0) |
+
+- `@NotBlank` is the strictest and is recommended for strings that must have content.
+- `@NotNull` is for non-string types (numbers, objects) that cannot be null.
+
+---
+
+### 15. How do you handle validation for file uploads?
+
+**Answer:** Use `@Valid` on the multipart form object:
+
+```java
+public class FileUpload {
+    @NotNull
+    @Size(min = 1, max = 10_485_760) // 10 MB
+    public FileUpload file;
+    @NotBlank
+    public String description;
+}
+
+@POST
+@Path("/upload")
+@Consumes(MediaType.MULTIPART_FORM_DATA)
+public Response upload(@Valid FileUpload upload) {
+    // validation runs automatically
+}
+```
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **Annotation** | `@Valid` activates validation |
+| **Core annotations** | `@NotNull`, `@NotBlank`, `@NotEmpty`, `@Size`, `@Min`, `@Max`, `@Email`, etc. |
+| **Nested validation** | `@Valid` on nested fields |
+| **Lists** | `@Valid List<T>` |
+| **Custom validators** | Create annotation + `ConstraintValidator` implementation |
+| **Cross-field** | Class-level custom validator |
+| **Error handling** | `ExceptionMapper<ConstraintViolationException>` or `@ServerExceptionMapper` |
+| **Reactive** | Validation runs before method invocation |
+| **Testing** | RestAssured + `@QuarkusTest` |
+| **Common pitfalls** | Forgetting `@Valid`, blocking validators, type erasure |

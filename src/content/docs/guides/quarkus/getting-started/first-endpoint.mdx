@@ -1,0 +1,178 @@
+---
+title: Your First REST Endpoint
+description: Build and understand a basic Quarkus REST endpoint using Jakarta REST annotations.
+sidebar:
+  order: 3
+  label: First REST Endpoint
+---
+
+- Writing `@Path`, `@GET`, `@POST`, returning JSON, and injecting services.
+
+### 1. How do you create a simple REST endpoint in Quarkus?
+
+**Answer:**  
+Add the `quarkus-rest` extension (or `quarkus-rest-jackson` for JSON) and annotate a class with `@Path`:
+
+```java
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "Hello, Quarkus!";
+    }
+}
+```
+
+Run with `quarkus dev` and visit `http://localhost:8080/hello`.
+
+---
+
+### 2. How do you return JSON from an endpoint?
+
+**Answer:**  
+Use `@Produces(MediaType.APPLICATION_JSON)` and return a POJO. Quarkus serializes it automatically with Jackson (or JSON-B depending on extension).
+
+```java
+@Path("/users")
+@Produces(MediaType.APPLICATION_JSON)
+public class UserResource {
+
+    @GET
+    @Path("/{id}")
+    public User getUser(@PathParam("id") Long id) {
+        return new User(id, "Alice", "alice@example.com");
+    }
+}
+
+public class User {
+    public Long id;
+    public String name;
+    public String email;
+    // constructor, getters/setters
+}
+```
+
+Extension needed: `quarkus-rest-jackson`
+
+---
+
+### 3. How do you inject a service (CDI bean) into a resource?
+
+**Answer:**  
+Annotate the service with a CDI scope (`@ApplicationScoped`, `@RequestScoped`) and inject with `@Inject`:
+
+```java
+@ApplicationScoped
+public class GreetingService {
+    public String greet(String name) {
+        return "Hello, " + name + "!";
+    }
+}
+
+@Path("/greet")
+public class GreetingResource {
+
+    @Inject
+    GreetingService service;
+
+    @GET
+    @Path("/{name}")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String greet(@PathParam("name") String name) {
+        return service.greet(name);
+    }
+}
+```
+
+---
+
+### 4. How do you handle POST requests with a JSON body?
+
+**Answer:**  
+Use `@POST`, `@Consumes(MediaType.APPLICATION_JSON)`, and accept the body as a method parameter:
+
+```java
+@POST
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public Response createUser(User user) {
+    // save user...
+    return Response.status(201).entity(user).build();
+}
+```
+
+**With Bean Validation:**
+```java
+@POST
+public Response createUser(@Valid User user) {
+    // user fields validated automatically
+}
+
+public class User {
+    @NotBlank
+    public String name;
+
+    @Email
+    public String email;
+}
+```
+
+---
+
+### 5. What HTTP methods are commonly used and how are they mapped?
+
+**Answer:**
+
+| HTTP Method | Annotation | Typical Use |
+| :--- | :--- | :--- |
+| GET | `@GET` | Read resource |
+| POST | `@POST` | Create resource |
+| PUT | `@PUT` | Full update |
+| PATCH | `@PATCH` | Partial update |
+| DELETE | `@DELETE` | Delete resource |
+
+---
+
+### 6. How do you read query parameters and path parameters?
+
+**Answer:**
+
+```java
+@GET
+@Path("/{id}")
+public User getById(
+    @PathParam("id") Long id,           // /users/42
+    @QueryParam("verbose") boolean v    // /users/42?verbose=true
+) {
+    return service.find(id, v);
+}
+```
+
+**Other injection points:**
+```java
+@HeaderParam("Authorization") String token   // Request header
+@CookieParam("session") String session       // Cookie value
+@FormParam("username") String username       // Form field
+```
+
+---
+
+### Summary Table
+
+| Task | Annotation / Approach |
+| :--- | :--- |
+| Define resource class | `@Path("/route")` |
+| GET endpoint | `@GET` |
+| POST endpoint | `@POST` + `@Consumes` |
+| Return JSON | `@Produces(APPLICATION_JSON)` |
+| Path variable | `@PathParam("name")` |
+| Query string | `@QueryParam("key")` |
+| Inject service | `@Inject` |
+| Validate body | `@Valid` on parameter |

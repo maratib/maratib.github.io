@@ -1,0 +1,96 @@
+---
+title: Build-Time vs. Runtime Processing 1
+description: Guides on Quarkus internals including CDI, ArC, build-time processing, and extension development.
+sidebar:
+  order: 1
+  label: Build-Time 1
+---
+
+### 1. What is the fundamental principle behind Quarkus's fast startup time?
+
+**Answer:** Quarkus uses an **Optimistic Compilation** strategy. Instead of doing all the heavy lifting (reflection setup, bean scanning, proxy generation) at **runtime**, it shifts as much work as possible to **build time**. When the application starts in JVM mode, it uses a pre-computed configuration. In native mode, these optimizations are even more critical.
+
+---
+
+### 2. What are "Build-Time" and "Runtime" in the context of Quarkus?
+
+**Answer:**
+*   **Build Time**: The phase when you run `mvn clean install` or `quarkus build`. Quarkus analyzes your code, extensions, and dependencies to create an optimized configuration.
+*   **Runtime**: The phase when you run `java -jar app.jar` or `./target/app`. Quarkus starts the application using the pre-computed configuration, skipping most initialization steps.
+
+---
+
+### 3. What specific tasks does Quarkus perform during Build Time?
+
+**Answer:** Quarkus performs several heavy tasks during build time:
+1.  **Bean Discovery**: Scanning all classes for CDI annotations (`@ApplicationScoped`, `@Component`, etc.).
+2.  **Proxy Generation**: Creating dynamic proxies for beans that use interceptors.
+3.  **Configuration Analysis**: Processing `application.properties`.
+4.  **Dependency Resolution**: Finding all necessary classes for the application.
+5.  **Optimization**: Registering reflection data, serializable classes, etc.
+
+---
+
+### 4. How does ArC (Quarkus CDI) differ from standard CDI in terms of build/runtime?
+
+**Answer:** Standard CDI (like Weld) relies heavily on runtime scanning and reflection. ArC performs a deep analysis at build time. It generates a ** bytecode-based** object graph of all beans. At startup, ArC simply loads this pre-computed graph, avoiding the overhead of scanning classpath or creating beans on the fly.
+
+---
+
+### 5. What happens to reflection-heavy frameworks (like Jackson or Hibernate) in Quarkus?
+
+**Answer:** These frameworks typically rely on runtime reflection. Quarkus detects their usage during build time. It then proactively analyzes the code and generates a **`reflect-config.json`** file (or equivalent bytecode metadata). This ensures that all necessary classes are registered for reflection **before** runtime, allowing native images to function correctly.
+
+---
+
+### 6. Can you force a specific operation to run at build time instead of runtime?
+
+**Answer:** Yes, using the **`@BuildTime`** annotation (provided by `quarkus-arc`). You can apply it to methods that perform heavy initialization. The method will be executed only once during the build, and its return value will be cached and used at runtime.
+
+```java
+@ApplicationScoped
+public class ConfigLoader {
+    @BuildTime
+    public LargeConfigObject loadConfig() {
+        // This runs during 'mvn compile' or 'quarkus build'
+        return new LargeConfigObject(...);
+    }
+}
+```
+
+---
+
+### 7. What is the purpose of `@RuntimeInit`?
+
+**Answer:** `@RuntimeInit` forces an initialization method to run at **application startup** (runtime), even if it looks like a candidate for build-time execution. This is useful for resources that depend on dynamic values that are not available during the build.
+
+---
+
+### 8. How do you check what actually runs at build time vs. runtime?
+
+**Answer:** You can enable **verbose logging** for the ArC extension. Set the following in your `application.properties`:
+
+```properties
+quarkus.arc.runtime-type-enricher.debug=true
+quarkus.arc.bean-discovery.debug=true
+```
+
+This will log detailed information about which beans are discovered and which methods are invoked during build time and runtime.
+
+---
+
+### 9. What is "Type Enrichment" in Quarkus?
+
+**Answer:** Type Enrichment is the process where Quarkus modifies the bytecode of your classes at build time to inject necessary logic (like interceptor bindings, lifecycle callbacks). It is essential for optimizing the application for native executables.
+
+---
+
+### 10. What happens if you use a standard CDI extension that doesn't support Quarkus's build-time optimizations?
+
+**Answer:** If the extension is not "Quarkus-aware," it will likely fail at runtime. The extension might try to perform classpath scanning or bean lookup that is not possible in a static native image. To fix this, you must either find a Quarkus-compatible alternative or implement a **`BuildStep`** to provide the necessary configuration to the extension at build time.
+
+---
+
+### 11. How does this relate to the `quarkus-arc-processor` dependency?
+
+**Answer:** `quarkus-arc-processor` is the Maven/Gradle dependency that contains the **Annotation Processor**. This processor is responsible for scanning your code during the build (e.g., during the `compile` phase) and performing the type enrichment and configuration generation.

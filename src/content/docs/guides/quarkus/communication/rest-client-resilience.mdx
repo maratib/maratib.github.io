@@ -1,0 +1,426 @@
+---
+title: REST Client Resilience
+description: Guides on Quarkus communication including REST clients, Kafka, messaging, and reactive streams.
+sidebar:
+  order: 3
+  label: REST Client Resilience
+---
+
+- Implementing `@Retry, @CircuitBreaker, @Timeout, and @Bulkhead` for external API calls.
+
+### 1. What is MicroProfile Fault Tolerance and how does it integrate with Quarkus?
+
+**Answer:**  
+**MicroProfile Fault Tolerance** is a specification that provides annotations and policies for building resilient microservices. Quarkus implements it via the **SmallRye Fault Tolerance** extension.
+
+It defines five core policies:
+- **Retry** – Re‑execute a failed operation.
+- **CircuitBreaker** – Stop calling a failing service to prevent cascading failures.
+- **Timeout** – Abort calls that exceed a specified duration.
+- **Bulkhead** – Limit concurrent calls to a service to avoid resource exhaustion.
+- **Fallback** – Provide an alternative result when the primary operation fails.
+
+These annotations can be applied to **any CDI bean method** (services, REST clients, etc.) and work with both **blocking** and **reactive** (`Uni`/`Multi`) return types.
+
+---
+
+### 2. How do you add Fault Tolerance to a Quarkus project?
+
+**Answer:**  
+Add the extension:
+
+```bash
+quarkus ext add smallrye-fault-tolerance
+```
+
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
+</dependency>
+```
+
+No additional configuration is required – the annotations work out of the box in both JVM and native modes.
+
+---
+
+### 3. How do you implement retry logic on a REST Client method?
+
+**Answer:**  
+Use `@Retry` on the client interface method or on the service method that calls the client:
+
+```java
+@Path("/api/users")
+@RegisterRestClient(configKey = "user-api")
+public interface UserClient {
+    @GET
+    @Path("/{id}")
+    @Retry(maxRetries = 3, delay = 1000, maxDuration = 5000)
+    Uni<User> getUser(@PathParam("id") Long id);
+}
+```
+
+**Parameters:**
+- `maxRetries` – number of retry attempts (default: 3).
+- `delay` – initial delay between retries (default: 0, in milliseconds).
+- `delayUnit` – time unit (default: `MILLISECONDS`).
+- `maxDuration` – maximum total time for retries.
+- `jitter` – random variation to avoid thundering herd.
+- `retryOn` / `abortOn` – specify which exceptions trigger or abort retries.
+
+**Example (reactive):**
+```java
+@Retry(maxRetries = 5, delay = 200, retryOn = {WebApplicationException.class})
+Uni<User> getUser(Long id);
+```
+
+---
+
+### 4. What is the difference between `retryOn` and `abortOn` in `@Retry`?
+
+**Answer:**
+
+- **`retryOn`** – Specifies which exceptions (or subclasses) should **trigger** a retry. If the method throws one of these, it retries.
+- **`abortOn`** – Specifies which exceptions should **abort** the retry immediately and propagate the failure without further attempts.
+
+If both are specified, `abortOn` takes precedence.
+
+**Example:**
+```java
+@Retry(retryOn = {IOException.class, TimeoutException.class},
+       abortOn = {IllegalArgumentException.class, AuthenticationException.class})
+Uni<User> getUser(Long id);
+```
+Retries on network/timeout issues but fails immediately on bad input or auth errors.
+
+---
+
+### 5. How do you implement a fallback for a failing REST Client call?
+
+**Answer:**  
+Use `@Fallback` to provide an alternative value or a fallback method:
+
+**Inline value:**
+```java
+@Fallback(fallbackMethod = "fallbackUser")
+Uni<User> getUser(Long id);
+
+default Uni<User> fallbackUser(Long id) {
+    return Uni.createFrom().item(new User("Guest", "guest@example.com"));
+}
+```
+
+**Using `@Fallback` with a class:**
+```java
+@Fallback(FallbackHandler.class)
+Uni<User> getUser(Long id);
+
+public class FallbackHandler implements FallbackHandler<Uni<User>> {
+    @Override
+    public Uni<User> handle(ExecutionContext context) {
+        return Uni.createFrom().item(new User("Fallback"));
+    }
+}
+```
+
+**⚠️ Important:** The fallback method must have the **same signature** (parameters + return type) as the original method.
+
+---
+
+### 6. Can you combine `@Retry` and `@Fallback` together? In what order are they executed?
+
+**Answer:**  
+Yes, you can combine them. The execution order is:
+
+1. **`@Retry`** attempts first – it retries the operation up to `maxRetries`.
+2. If all retries fail, **`@Fallback`** is invoked to return a fallback value.
+
+The fallback runs **after** retries are exhausted. This allows you to attempt recovery several times before falling back to a default.
+
+```java
+@Retry(maxRetries = 3)
+@Fallback(fallbackMethod = "fallbackUser")
+Uni<User> getUser(Long id);
+```
+
+---
+
+### 7. What is a Circuit Breaker and how do you implement it in Quarkus?
+
+**Answer:**  
+A **Circuit Breaker** prevents a system from repeatedly calling a failing remote service. It has three states:
+
+- **CLOSED** – Normal operation; calls are allowed.
+- **OPEN** – Calls are blocked immediately (fail fast) after a failure threshold is reached.
+- **HALF_OPEN** – After a waiting period, a few test calls are allowed to check if the service is healthy again.
+
+**Implementation:**
+```java
+@CircuitBreaker(
+    requestVolumeThreshold = 10,   // minimum calls before tripping
+    failureRatio = 0.5,            // 50% failures trips the circuit
+    delay = 5000,                  // time in HALF_OPEN state before retrying
+    successThreshold = 2           // number of successes to close the circuit
+)
+Uni<User> getUser(Long id);
+```
+
+**Parameters:**
+- `requestVolumeThreshold` – number of requests in a rolling window before failure ratio is evaluated.
+- `failureRatio` – failure rate threshold (0.0 to 1.0) that opens the circuit.
+- `delay` – time (in milliseconds) the circuit stays OPEN before entering HALF_OPEN.
+- `successThreshold` – consecutive successes in HALF_OPEN to close the circuit.
+
+---
+
+### 8. How does the Circuit Breaker work with reactive (`Uni`/`Multi`) methods?
+
+**Answer:**  
+SmallRye Fault Tolerance handles reactive types natively. The circuit breaker observes the `Uni` or `Multi` **completion/failure**, not just method invocation.
+
+- If the `Uni` fails (emits a failure), it counts as a failure.
+- If the `Uni` succeeds (emits an item), it counts as a success.
+- When the circuit is OPEN, `Uni` methods **fail immediately** without invoking the remote service, emitting a `CircuitBreakerOpenException` that you can handle with `.onFailure().recoverWithItem()`.
+
+---
+
+### 9. What is a Bulkhead and when should you use it?
+
+**Answer:**  
+A **Bulkhead** limits the number of concurrent calls to a service to prevent resource exhaustion (e.g., thread pool, connection pool, or database connection saturation). It protects both the caller and the downstream service.
+
+**Types:**
+- **Semaphore bulkhead** – limits concurrent invocations on the same thread (works with blocking and reactive).
+- **Thread pool bulkhead** – uses a separate thread pool for execution (deprecated in some MP versions; not recommended with reactive).
+
+**Example:**
+```java
+@Bulkhead(value = 5, waitingTaskQueue = 10)
+Uni<User> getUser(Long id);
+```
+- `value` – maximum concurrent calls allowed.
+- `waitingTaskQueue` – number of pending requests allowed to queue; if exceeded, a `BulkheadException` is thrown.
+
+**When to use:** For services with limited capacity (e.g., a database connection pool size of 20) to prevent overwhelming them with too many parallel requests.
+
+---
+
+### 10. What is the `@Timeout` annotation and how does it interact with reactive clients?
+
+**Answer:**  
+`@Timeout` sets a maximum execution time for a method. If the method does not complete within the specified duration, it is interrupted and a `TimeoutException` is thrown.
+
+**Example:**
+```java
+@Timeout(value = 5, unit = ChronoUnit.SECONDS)
+Uni<User> getUser(Long id);
+```
+
+**Reactive behavior:**
+- The timeout applies to the **entire `Uni`/`Multi` pipeline** – from the moment the method is invoked until the `Uni` emits an item or failure.
+- If the `Uni` times out, the pipeline fails with `TimeoutException` (which you can catch with `.onFailure(TimeoutException.class)`).
+
+**⚠️ Caveat:** The timeout does **not** cancel the underlying HTTP request automatically – the request may continue in the background. Use client-level `readTimeout` for more predictable HTTP-level cancellation.
+
+---
+
+### 11. How do you configure Fault Tolerance policies via `application.properties` instead of annotations?
+
+**Answer:**  
+You can externalize configuration using MicroProfile Config with the prefix:
+`{fullyQualifiedClassName}/{methodName}/{policy}/...`
+
+**Example:**
+```properties
+# For method getUser in com.example.UserClient
+com.example.UserClient/getUser/Retry/maxRetries=5
+com.example.UserClient/getUser/Retry/delay=1000
+com.example.UserClient/getUser/CircuitBreaker/failureRatio=0.3
+```
+
+Or globally using a `@ConfigProperty` injection (less common).
+
+**💡 Tip:** Configuration properties override annotation values, allowing you to tune resilience without recompiling.
+
+---
+
+### 12. What is the difference between client‑level timeouts and `@Timeout`?
+
+**Answer:**
+
+| Aspect | Client‑level timeout (`mp-rest/readTimeout`) | `@Timeout` (Fault Tolerance) |
+| :--- | :--- | :--- |
+| **Scope** | HTTP client connection/read timeout | Method execution timeout (all logic) |
+| **Cancellation** | Cancels the underlying HTTP request | Does NOT cancel the request (may run in background) |
+| **Granularity** | Per REST client configuration | Per method |
+| **Use case** | Network‑level protection | Business‑logic timeout (including retries, fallback logic) |
+
+**Recommendation:** Use **both** – `readTimeout` for HTTP-level safety and `@Timeout` for overall method execution boundaries (including retry delays).
+
+---
+
+### 13. Can you apply Fault Tolerance annotations to a method that returns `Multi`?
+
+**Answer:**  
+Yes. For `Multi`, the policies apply to the **entire stream**:
+
+- **Retry** – if the `Multi` fails (emits an error), it retries the entire stream.
+- **CircuitBreaker** – counts stream failures (error events) as failures; successes (item emissions) as successes.
+- **Timeout** – the stream must emit at least one item within the timeout, otherwise it fails.
+- **Bulkhead** – limits concurrent subscriptions to the stream.
+
+**Example:**
+```java
+@Retry(maxRetries = 2)
+@Timeout(10)
+Multi<User> getAllUsers();
+```
+
+**⚠️ Note:** Retrying a `Multi` that has already started emitting items will **re‑execute** the entire call from scratch – it does not resume from where it left off.
+
+---
+
+### 14. How do you handle `CircuitBreakerOpenException` gracefully in a REST endpoint?
+
+**Answer:**  
+When the circuit is OPEN, the client method throws `CircuitBreakerOpenException`. You can handle it in the reactive pipeline:
+
+```java
+@GET
+@Path("/{id}")
+public Uni<Response> getUser(@PathParam("id") Long id) {
+    return userClient.getUser(id)
+        .onFailure(CircuitBreakerOpenException.class)
+        .recoverWithItem(() -> Response.status(503)
+                                       .entity("Service temporarily unavailable")
+                                       .build())
+        .onItem().transform(Response::ok);
+}
+```
+
+Alternatively, use `@Fallback` on the client interface to return a default user when the circuit is open.
+
+---
+
+### 15. How do you test Fault Tolerance policies in Quarkus?
+
+**Answer:**  
+Use `@QuarkusTest` with controlled failures (e.g., WireMock stubs that return errors).
+
+```java
+@QuarkusTest
+public class UserClientResilienceTest {
+    @Inject
+    @RestClient
+    UserClient client;
+
+    @Test
+    public void testRetryAndFallback() {
+        // WireMock stub returns 500 twice, then 200
+        stubFor(get("/users/1")
+            .willReturn(serverError())
+            .willReturn(serverError())
+            .willReturn(okJson("{\"id\":1,\"name\":\"John\"}")));
+
+        User user = client.getUser(1L).await().atMost(Duration.ofSeconds(5));
+        assertEquals("John", user.name); // retry succeeded
+    }
+
+    @Test
+    public void testCircuitBreaker() {
+        // Simulate 10 failures to trip the circuit
+        for (int i = 0; i < 10; i++) {
+            assertThrows(... client.getUser(...).await());
+        }
+        // Next call should fail fast with CircuitBreakerOpenException
+    }
+}
+```
+
+For more advanced tests, use `@QuarkusTest` with `@TestProfile` to adjust configuration.
+
+---
+
+### 16. What is the relationship between Fault Tolerance and Mutiny's own error recovery operators?
+
+**Answer:**  
+They complement each other:
+
+- **Fault Tolerance annotations** (`@Retry`, `@CircuitBreaker`) work at the **method invocation level** – they wrap the entire method call.
+- **Mutiny operators** (`.onFailure().retry()`, `.onFailure().recoverWithItem()`) work at the **pipeline level** – they give you finer control over individual reactive streams.
+
+You can combine both:
+```java
+@Retry(maxRetries = 3) // method-level
+public Uni<User> getUser(Long id) {
+    return client.getUser(id)
+        .onFailure().recoverWithItem(fallbackUser); // pipeline-level
+}
+```
+
+**Recommendation:** Use Fault Tolerance for cross‑cutting resilience policies and Mutiny operators for more complex, stateful recovery logic.
+
+---
+
+### 17. Does Fault Tolerance work in native images?
+
+**Answer:**  
+Yes. SmallRye Fault Tolerance is fully supported in native images because Quarkus processes the annotations at build time and generates the necessary bytecode. No reflection is required at runtime, making it native‑friendly.
+
+---
+
+### 18. How do you configure a global `@Retry` policy for all methods of a REST Client?
+
+**Answer:**  
+You cannot apply a single annotation to all methods, but you can:
+
+1. **Use configuration properties** – define retry settings in `application.properties` for each method individually.
+2. **Create a base interface** with default methods and apply annotations there, then extend it.
+3. **Use an interceptor/CDI decorator** – write a custom interceptor that applies retry logic to all methods matching a pattern (more advanced).
+
+Most projects define retries per method or at the service layer where the client is called.
+
+---
+
+### 19. What happens when multiple Fault Tolerance policies are applied to the same method (e.g., `@Retry` + `@CircuitBreaker`)?
+
+**Answer:**  
+The execution order is:
+
+1. **`@Bulkhead`** – checks capacity.
+2. **`@CircuitBreaker`** – checks if circuit is OPEN.
+3. **`@Timeout`** – starts the timeout clock.
+4. **`@Retry`** – executes the method with retries.
+5. **`@Fallback`** – invoked only after retries are exhausted and the method still fails.
+
+**Example flow:**
+```
+Bulkhead → CircuitBreaker → (Timeout starts) → Retry (attempt 1) → fail → Retry (attempt 2) → fail → ... → Fallback
+```
+
+---
+
+### 20. What are the common pitfalls with Fault Tolerance in Quarkus 3.9+?
+
+**Answer:**
+
+- **Self‑invocation issue** – Like `@Transactional`, Fault Tolerance annotations work via CDI interceptors. Calling a `@Retry` method from within the same class **does not** trigger the interceptor (self‑invocation bypasses the proxy).
+- **Reactive thread context** – `@Bulkhead` with thread pool mode does **not** work well with reactive (event‑loop) threads. Use semaphore bulkhead (default) for reactive methods.
+- **`@Retry` on `Multi`** – Retrying a `Multi` restarts the entire stream, which can lead to duplicate processing. Ensure your endpoints are idempotent.
+- **Timeout vs. client timeouts** – `@Timeout` does **not** cancel the underlying HTTP request. Always set `readTimeout` separately for network‑level cancellation.
+- **Too many retries** – Aggressive retries can degrade performance and cause cascading failures. Use exponential backoff (`delay` + `delayUnit`) and limit `maxDuration`.
+- **Fallback exceptions** – If the fallback method itself throws an exception, that exception propagates (no further retry). Ensure fallbacks are lightweight and robust.
+- **Circuit Breaker state persistence** – State is in‑memory only; it resets when the application restarts. For distributed circuit breakers, consider external solutions (e.g., Resilience4j with Redis).
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Annotation | Purpose | Key Parameters | Works with Reactive? |
+| :--- | :--- | :--- | :--- |
+| `@Retry` | Re‑execute on failure | `maxRetries`, `delay`, `retryOn`, `abortOn` | Yes (Uni/Multi) |
+| `@CircuitBreaker` | Prevent repeated failures | `failureRatio`, `requestVolumeThreshold`, `delay` | Yes |
+| `@Timeout` | Abort long‑running operations | `value`, `unit` | Yes (fails the Uni) |
+| `@Bulkhead` | Limit concurrency | `value`, `waitingTaskQueue` | Yes (semaphore) |
+| `@Fallback` | Provide alternative result | `fallbackMethod` or `FallbackHandler` class | Yes |

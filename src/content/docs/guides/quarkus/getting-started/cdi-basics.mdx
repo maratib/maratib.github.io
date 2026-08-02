@@ -1,0 +1,173 @@
+---
+title: CDI & Dependency Injection Basics
+description: Understanding CDI scopes, @Inject, @Produces, and bean lifecycle in Quarkus.
+sidebar:
+  order: 4
+  label: CDI Basics
+---
+
+- Scopes (`@ApplicationScoped`, `@RequestScoped`), `@Inject`, producers, and qualifiers.
+
+### 1. What is CDI and how does Quarkus use it?
+
+**Answer:**  
+**CDI (Contexts and Dependency Injection)** is the standard dependency injection framework in Jakarta EE. Quarkus uses **ArC**, its own build-time CDI implementation that processes beans at compile time — making it fast and native-image compatible.
+
+Key difference from Spring: CDI uses **scopes** tied to lifecycle contexts (HTTP request, application, session), not just singletons/prototypes.
+
+---
+
+### 2. What are the main CDI scopes in Quarkus?
+
+**Answer:**
+
+| Scope | Annotation | Lifecycle | When to use |
+| :--- | :--- | :--- | :--- |
+| Dependent | `@Dependent` (default) | New instance per injection point | Stateful, short-lived beans |
+| Application | `@ApplicationScoped` | One instance per app lifetime | Stateless services, repositories |
+| Request | `@RequestScoped` | One per HTTP request | Request-scoped state |
+| Singleton | `@Singleton` | Same as ApplicationScoped (no proxy) | Simple singletons |
+
+**Most common:** `@ApplicationScoped` for services, `@RequestScoped` for request-specific state.
+
+---
+
+### 3. How do you inject a bean with `@Inject`?
+
+**Answer:**
+
+**Field injection (simplest):**
+```java
+@ApplicationScoped
+public class OrderService {
+
+    @Inject
+    UserRepository userRepo;
+
+    @Inject
+    EmailService emailService;
+
+    public void placeOrder(Order order) {
+        User user = userRepo.findById(order.userId);
+        emailService.sendConfirmation(user.email);
+    }
+}
+```
+
+**Constructor injection (recommended for testability):**
+```java
+@ApplicationScoped
+public class OrderService {
+    private final UserRepository userRepo;
+    private final EmailService emailService;
+
+    @Inject
+    public OrderService(UserRepository userRepo, EmailService emailService) {
+        this.userRepo = userRepo;
+        this.emailService = emailService;
+    }
+}
+```
+
+---
+
+### 4. What is a CDI producer (`@Produces`)?
+
+**Answer:**  
+A `@Produces` method creates a bean from code you control (e.g., third-party classes or conditional logic):
+
+```java
+@ApplicationScoped
+public class ConfigProducer {
+
+    @Produces
+    @ApplicationScoped
+    public ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        return mapper;
+    }
+}
+
+// Inject it anywhere:
+@Inject
+ObjectMapper mapper;
+```
+
+---
+
+### 5. What are qualifiers and when do you need them?
+
+**Answer:**  
+Qualifiers distinguish between multiple beans of the same type:
+
+```java
+// Define qualifier
+@Qualifier
+@Retention(RUNTIME)
+@Target({FIELD, METHOD, TYPE})
+public @interface Premium {}
+
+// Two implementations
+@ApplicationScoped
+public class BasicEmailService implements EmailService { ... }
+
+@ApplicationScoped
+@Premium
+public class PremiumEmailService implements EmailService { ... }
+
+// Inject specific one
+@Inject
+@Premium
+EmailService emailService;
+```
+
+Without a qualifier, CDI would fail with an "ambiguous dependencies" error if two beans satisfy the same type.
+
+---
+
+### 6. What is `@Observes` and how do you listen to CDI events?
+
+**Answer:**  
+CDI events allow decoupled communication between beans:
+
+```java
+// Fire an event
+@Inject
+Event<UserCreatedEvent> userCreatedEvent;
+
+public void createUser(User user) {
+    // ... save user
+    userCreatedEvent.fire(new UserCreatedEvent(user));
+}
+
+// Listen to it
+public void onUserCreated(@Observes UserCreatedEvent event) {
+    emailService.sendWelcome(event.getUser().email);
+}
+```
+
+Quarkus also supports startup/shutdown events:
+```java
+void onStart(@Observes StartupEvent event) {
+    log.info("Application started");
+}
+
+void onStop(@Observes ShutdownEvent event) {
+    log.info("Application stopping");
+}
+```
+
+---
+
+### Summary Table
+
+| Concept | Key Point |
+| :--- | :--- |
+| `@ApplicationScoped` | One shared instance per app |
+| `@RequestScoped` | New instance per HTTP request |
+| `@Inject` | Injects a managed CDI bean |
+| `@Produces` | Creates beans from custom factory methods |
+| Qualifier | Disambiguates multiple beans of same type |
+| `@Observes` | Listens to CDI events (decoupled communication) |
+| ArC | Quarkus's build-time CDI — no runtime reflection |

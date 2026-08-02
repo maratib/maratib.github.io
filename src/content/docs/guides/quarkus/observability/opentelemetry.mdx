@@ -1,0 +1,102 @@
+---
+title: Distributed Tracing (OpenTelemetry) 
+description: Guides on Quarkus observability including metrics, tracing, health checks, and logging.
+sidebar:
+  order: 3
+  label: OpenTelemetry
+---
+- Adding trace IDs to logs and tracing requests across microservices.
+
+### 1. What is distributed tracing and why is it important for microservices?
+
+**Answer:** Distributed tracing is a method used to profile and monitor applications, particularly those built using a microservices architecture. It allows you to track a single request as it travels through various services, providing a detailed, end-to-end view of its journey. This is crucial for:
+- **Debugging**: Pinpointing where failures or latency spikes occur.
+- **Performance Analysis**: Understanding service dependencies and bottlenecks.
+- **Optimization**: Identifying which parts of the system need improvement.
+
+---
+
+### 2. What is OpenTelemetry (OTel) and what is its relationship with Quarkus?
+
+**Answer:** OpenTelemetry is an open-source observability framework that provides a single, vendor-neutral set of APIs, SDKs, and tools for collecting telemetry data (traces, metrics, and logs).
+
+In Quarkus, **OpenTelemetry is the recommended approach for distributed tracing and telemetry**. Quarkus offers built-in `quarkus-opentelemetry` extensions, which are optimized for both JVM and native builds. It has replaced the older OpenTracing implementation.
+
+---
+
+### 3. How do you add OpenTelemetry tracing to a Quarkus project?
+
+**Answer:** The main extension for tracing is `quarkus-opentelemetry`. You can add it via:
+
+```bash
+quarkus ext add opentelemetry
+```
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-opentelemetry</artifactId>
+</dependency>
+```
+
+
+No additional code is required for basic instrumentation; Quarkus automatically instruments REST endpoints and REST clients.
+
+---
+
+### 4. What is the recommended way to export telemetry data from Quarkus?
+
+**Answer:** The **OpenTelemetry OTLP (OpenTelemetry Protocol) protocol is the recommended way to send telemetry data (traces, metrics, and logs) out of a Quarkus application**. It provides a unified output for all telemetry signals. Exporters like **Jaeger** or **SigNoz** can then be configured to receive this data.
+
+---
+
+### 5. How do you configure OpenTelemetry in `application.properties`?
+
+**Answer:** You can configure the OTLP exporter and other settings in `application.properties`:
+
+```properties
+# Set the application name (also via OTEL_RESOURCE_ATTRIBUTES)
+quarkus.application.name=my-quarkus-app
+
+# Configure OTLP exporter endpoint and headers
+quarkus.otel.exporter.otlp.endpoint=${OTEL_EXPORTER_OTLP_ENDPOINT}
+quarkus.otel.exporter.otlp.headers=${OTEL_EXPORTER_OTLP_HEADERS:}
+quarkus.otel.resource.attributes=${OTEL_RESOURCE_ATTRIBUTES:}
+```
+
+
+Many Quarkus OpenTelemetry configurations use the `quarkus.otel.*` prefix and align with the OpenTelemetry SDK Autoconfigure specifications.
+
+---
+
+### 6. What is the difference between a trace and a span?
+
+**Answer:** These are the two fundamental concepts in distributed tracing:
+- **Trace**: Represents the entire journey of a single request as it propagates through a distributed system. It is composed of a tree of spans.
+- **Span**: Represents a single unit of work or operation within a trace. It has a name, start time, duration, and can contain logs and attributes.
+
+---
+
+### 7. How does context propagation work in a Quarkus application?
+
+**Answer:** Context propagation is the mechanism that links spans together to form a trace, even across process or network boundaries.
+
+When a request enters a Quarkus service, OpenTelemetry automatically injects the trace context (trace ID, span ID, etc.) into outgoing HTTP requests via standard headers (`traceparent`, `tracestate`). The receiving service extracts this context, creating a new span that is a child of the previous one, thus maintaining the trace. This ensures a continuous, end-to-end view of the request.
+
+---
+
+### 8. What is a common pitfall when working with traces and multiple threads in Quarkus?
+
+**Answer:** A common pitfall is the **trace context not being automatically propagated** when work is offloaded to a different thread. Because context propagation is often thread-local, a span started on one thread will not be automatically linked to work done on another. In Quarkus, this can be addressed by ensuring that reactive or async code is instrumented correctly.
+
+---
+
+### 9. Is there an annotation to mark a method for manual tracing?
+
+**Answer:** The `@Traced` annotation is no longer available, as it was part of the older OpenTracing implementation. With OpenTelemetry, manual instrumentation is typically done by injecting the `Tracer` instance and programmatically creating spans, or by using CDI interceptors for a more declarative approach.
+
+---
+
+### 10. What is the relationship between Micrometer and OpenTelemetry for metrics in Quarkus?
+
+**Answer:** Micrometer has long been the default for metrics in Quarkus. However, a bridge, `quarkus-micrometer-opentelemetry`, now exists. This extension allows you to **send existing Micrometer metrics via the OpenTelemetry protocol**. This provides a unified observability pipeline where both traces and metrics are exported using OpenTelemetry, aligning with the recommended OTLP standard.

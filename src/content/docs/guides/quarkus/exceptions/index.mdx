@@ -1,0 +1,244 @@
+---
+title: Global Exception
+description: Guides on Quarkus exception handling including ExceptionMapper, @ServerExceptionMapper, and error responses.
+sidebar:
+  order: 1
+  label: Global Exceptionns
+---
+
+### 1. Global Exception Handling in Quarkus
+
+In Quarkus, the primary mechanism for handling exceptions globally is **JAX‑RS `ExceptionMapper`** (or the newer **`@ServerExceptionMapper`** introduced in Quarkus 3.x). This allows you to define a consistent error response format for any exception thrown by your REST endpoints.
+
+#### Key Annotations & Interfaces
+
+| Mechanism | Description |
+| :--- | :--- |
+| `ExceptionMapper<E>` | JAX‑RS interface that maps a specific exception to a `Response`. |
+| `@Provider` | Marks the class as a JAX‑RS provider (must be registered). |
+| `@ServerExceptionMapper` | Quarkus‑specific alternative that works with both blocking and reactive endpoints, and allows more flexibility (e.g., access to `ContainerRequestContext`). |
+| `@Priority` | Controls the order of execution when multiple mappers could handle the same exception (lower numbers have higher priority). |
+
+#### Default Exception Handling
+
+- **Validation failures** → `ConstraintViolationException` → returns **400 Bad Request** with a default JSON body (in Quarkus 3.9+, the default format is quite readable).
+- **Security failures** → `ForbiddenException`, `NotAuthorizedException` → **403/401**.
+- **WebApplicationException** (or subclasses) → mapped according to the status code set.
+- Any **unhandled exception** → **500 Internal Server Error**.
+
+#### Creating a Custom Global Exception Mapper
+
+```java
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.ext.Provider;
+
+@Provider
+public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
+    @Override
+    public Response toResponse(Throwable exception) {
+        ErrorResponse error = new ErrorResponse(
+            "Internal server error",
+            exception.getMessage()
+        );
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                       .entity(error)
+                       .type(MediaType.APPLICATION_JSON)
+                       .build();
+    }
+}
+```
+
+#### Handling Multiple Exception Types
+
+You can create individual mappers for specific exception types, and one catch‑all for `Throwable`. The most specific one (subclass) takes precedence.
+
+```java
+@Provider
+public class ValidationExceptionMapper implements ExceptionMapper<ConstraintViolationException> {
+    @Override
+    public Response toResponse(ConstraintViolationException ex) {
+        // build structured error
+    }
+}
+
+@Provider
+public class NotFoundExceptionMapper implements ExceptionMapper<NotFoundException> {
+    @Override
+    public Response toResponse(NotFoundException ex) {
+        return Response.status(404).entity(new ErrorResponse("Not found", ex.getMessage())).build();
+    }
+}
+```
+
+#### Using `@ServerExceptionMapper` (Quarkus 3.9+)
+
+This newer approach is more flexible and works with reactive endpoints. You can place it inside any CDI bean.
+
+```java
+@ApplicationScoped
+public class ExceptionHandlers {
+    @ServerExceptionMapper
+    public Response handleConstraintViolation(ConstraintViolationException ex) {
+        // custom mapping
+    }
+
+    @ServerExceptionMapper
+    public Response handleThrowable(Throwable ex) {
+        // catch-all
+    }
+}
+```
+
+**Advantage**: You can inject `ContainerRequestContext` or other services into the method.
+
+#### Error Response DTO
+
+```java
+public class ErrorResponse {
+    private String code;
+    private String message;
+    private List<FieldError> fieldErrors;
+    // constructors, getters, setters
+}
+
+public class FieldError {
+    private String field;
+    private String message;
+}
+```
+
+#### Order of Execution
+
+When multiple mappers are eligible for the same exception, JAX‑RS uses the following precedence:
+
+1. Most specific subtype match.
+2. If multiple mappers match, `@Priority` decides (lower number runs first, but only one will ultimately be chosen – the highest priority among matches).
+3. If none, the default container behaviour applies.
+
+In `@ServerExceptionMapper`, you can also use `@Priority`.
+
+---
+
+### 2. Centralizing Exception Handling & Common Utilities Across Microservices
+
+You want to share a common package (e.g., `common-utils`) across multiple Quarkus microservices. Here are the recommended strategies.
+
+#### Option A: Shared Maven/Gradle Module
+
+Create a separate Java module (e.g., `common`) that contains:
+
+- Custom exception classes
+- Exception mappers (`@Provider` classes)
+- Error DTOs
+- Utility classes (e.g., date/time helpers, validators)
+- Common configuration (e.g., `@ConfigMapping` interfaces)
+
+**Project structure**:
+```
+parent/
+├── common/
+│   ├── pom.xml (or build.gradle)
+│   └── src/main/java/... (Exception mappers, DTOs, Utils)
+├── service-a/
+│   ├── pom.xml (depends on common)
+│   └── src/...
+└── service-b/
+    ├── pom.xml (depends on common)
+    └── src/...
+```
+
+**Important**: The `common` module must be built and published as a JAR (install/deploy) so each service can pull it as a dependency.
+
+#### Option B: Multi‑module Build (Single Repository)
+
+If all services live in the same monorepo, you can use Maven's `<modules>` or Gradle's composite builds. The `common` module is built together with the services.
+
+---
+
+#### Considerations for Quarkus Native Images
+
+- **Reflection**: Exception mappers are usually discovered at runtime via `@Provider` and classpath scanning. In native image, you must either:
+  - Use the `quarkus.native.resources.includes` to ensure `META-INF/services/jakarta.ws.rs.ext.ExceptionMapper` entries are included.
+  - Or register the mappers explicitly in `@RegisterForReflection`.
+  
+  Quarkus usually handles `@Provider` scanning at build time, but if your mappers are in a separate JAR, ensure the JAR is included in the native image classpath.
+
+- **Avoid reflection-heavy libraries in `common`** – use Quarkus‑friendly utilities (e.g., Jackson for JSON, Mutiny for reactive programming).
+
+- **Configuration**: If you have common `@ConfigMapping` interfaces in the shared module, they will be processed at build time in each service. That works fine.
+
+#### Best Practices for Shared Exception Handling
+
+1. **Define a base exception**: e.g., `BusinessException` with a `code` and `message`. Services can throw these, and the common mapper will format them consistently.
+2. **Keep mappers in the shared module**: The common module can contain mappers for `ConstraintViolationException`, `WebApplicationException`, etc. If a service uses additional custom exceptions, it can add its own mappers that extend or chain.
+3. **Use `@Priority` to override**: If a service wants to replace a common mapper, it can define its own with a higher priority (lower number).
+4. **Version the common library**: Use semantic versioning. A breaking change to error responses should be a major version bump.
+
+#### Example of a Shared Module `pom.xml`
+
+```xml
+<groupId>com.mycompany</groupId>
+<artifactId>common-utils</artifactId>
+<version>1.0.0</version>
+
+<dependencies>
+    <!-- Quarkus APIs (provided scope) -->
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-core</artifactId>
+        <scope>provided</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-rest</artifactId>
+        <scope>provided</scope>
+    </dependency>
+    <!-- Jackson for error DTOs -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <scope>provided</scope>
+    </dependency>
+</dependencies>
+```
+
+In each service:
+```xml
+<dependency>
+    <groupId>com.mycompany</groupId>
+    <artifactId>common-utils</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+#### Automatically Registering Mappers in Quarkus
+
+Quarkus automatically discovers `@Provider` classes via classpath scanning at build time (using the CDI extension). As long as the shared module is on the classpath at build time, the mappers will be picked up.
+
+If you're building a native image, you may want to use the `quarkus.native.additional-build-args` to force inclusion of specific classes (if scanning fails). But usually, Quarkus handles it correctly.
+
+#### Alternative: Using `@ServerExceptionMapper` in a Shared CDI Bean
+
+Instead of `@Provider`, you could define a shared CDI bean with `@ServerExceptionMapper` methods and package it in the common library. Since CDI beans are discovered at build time, they will be automatically picked up.
+
+```java
+@ApplicationScoped
+public class SharedExceptionHandlers {
+    @ServerExceptionMapper
+    public Response handleBusiness(BusinessException ex) {
+        // ...
+    }
+}
+```
+
+This approach is more Quarkus‑idiomatic and works well in native images.
+
+---
+
+### Conclusion
+
+- **Global exception handling** in Quarkus can be centralized using `@ServerExceptionMapper` or `ExceptionMapper` with `@Provider`.
+- **Sharing across microservices** is best done by creating a common Maven/Gradle module that includes the exception mappers, DTOs, and utilities. Each service then depends on this module.
+- **Native image compatibility** requires that the shared library is included in the build classpath and that reflection (if any) is handled properly. Quarkus usually works fine with `@Provider` scanning.
+

@@ -1,0 +1,389 @@
+---
+title: Panache (Active Record vs. Repository Pattern)
+description: Guides on Quarkus persistence, Hibernate ORM, Panache, and database integration.
+sidebar:
+  order: 10
+  label: Panache
+---
+
+## Panache (Active Record vs. Repository Pattern)  
+When to use `PanacheEntity` vs `PanacheRepository`, and how they simplify Hibernate ORM.
+
+---
+
+### 1. What is Panache and why does Quarkus provide it?
+
+**Answer:**  
+Panache is Quarkus's opinionated layer on top of Hibernate ORM (and Hibernate Reactive) that simplifies data access. It reduces boilerplate by offering two programming models:
+
+- **Active Record** – entities inherit from `PanacheEntity` and get built‑in CRUD methods.
+- **Repository** – you write a repository class implementing `PanacheRepository` and inject it.
+
+Panache also provides a rich, type‑safe query API that drastically cuts down the amount of JPA/JPQL code you need to write, while still allowing full custom queries when needed.
+
+---
+
+### 2. What are the two main approaches in Panache? Explain them.
+
+**Answer:**
+
+| Pattern | Implementation | Example |
+| :--- | :--- | :--- |
+| **Active Record** | Your entity extends `PanacheEntity` (or `PanacheEntityBase`) and you call static methods like `persist()`, `find()`, `delete()`. | `User.persist(user);` |
+| **Repository** | You create a repository class (e.g., `UserRepository`) that implements `PanacheRepository<Entity>`. You inject the repository and call its methods. | `userRepository.persist(user);` |
+
+Both patterns give you the same feature set (CRUD, queries, pagination) – the choice is a matter of architectural preference.
+
+---
+
+### 3. How do you define a Panache entity using the Active Record pattern?
+
+**Answer:**
+
+```java
+import jakarta.persistence.Entity;
+import io.quarkus.hibernate.orm.panache.PanacheEntity;
+
+@Entity
+public class User extends PanacheEntity {
+    public String name;
+    public String email;
+    // No need to define an @Id – PanacheEntity provides a public Long id
+}
+```
+
+Now `User` has static methods like:
+- `User.findById(id)`
+- `User.listAll()`
+- `User.persist(user)`
+- `User.deleteById(id)`
+
+You can also add custom static methods inside the entity.
+
+---
+
+### 4. What is the difference between `PanacheEntity` and `PanacheEntityBase`?
+
+**Answer:**
+
+- **`PanacheEntity`** – Provides a default `Long id` field (auto‑generated). Use this when you want a simple, numeric primary key.
+- **`PanacheEntityBase`** – Does **not** provide an `id` field. You must define your own primary key (e.g., `UUID`, composite key, or `String`). It gives you full control over the ID mapping.
+
+Example:
+```java
+@Entity
+public class Product extends PanacheEntityBase {
+    @Id
+    public String sku;  // custom primary key
+    public String name;
+}
+```
+
+---
+
+### 5. How do you define a Panache repository?
+
+**Answer:**
+
+```java
+import io.quarkus.hibernate.orm.panache.PanacheRepository;
+import jakarta.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class UserRepository implements PanacheRepository<User> {
+    // You can add custom query methods here
+    public List<User> findByName(String name) {
+        return find("name", name).list();
+    }
+}
+```
+
+Then inject it anywhere:
+```java
+@Inject
+UserRepository userRepository;
+```
+
+---
+
+### 6. Which pattern should you choose – Active Record or Repository? When to use each?
+
+**Answer:**
+
+- **Active Record** is simpler and more concise – ideal for **small to medium‑sized applications**, rapid prototyping, and cases where the entity itself is the single source of truth.
+- **Repository** is preferred for **clean architecture**, **domain‑driven design**, or when you want to decouple the persistence logic from the entity. It also makes testing easier because you can mock the repository.
+
+**Quarkus recommendation**: Both are fully supported. Start with Active Record for simplicity; switch to Repository if your domain logic grows complex or you need multiple data sources.
+
+---
+
+### 7. How does Panache simplify queries compared to plain JPA?
+
+**Answer:**  
+Panache provides a fluent, type‑safe API that eliminates boilerplate:
+
+```java
+// JPA (plain)
+TypedQuery<User> query = em.createQuery("SELECT u FROM User u WHERE u.name = :name", User.class);
+query.setParameter("name", "John");
+List<User> users = query.getResultList();
+
+// Panache Active Record
+List<User> users = User.find("name", "John").list();
+```
+
+It also supports:
+- **Pagination**: `User.find("name", "John").page(Page.ofSize(20)).list()`
+- **Projections**: `User.find("name", "John").project(UserDto.class).list()`
+- **Streaming** (reactive): `User.streamAll()` for large result sets.
+
+---
+
+### 8. How do you write custom queries with Panache (JPQL, native SQL)?
+
+**Answer:**  
+You can use JPQL or native SQL in the `find()` method.
+
+**JPQL:**
+```java
+User.find("SELECT u FROM User u WHERE u.email LIKE ?1", "%@gmail.com");
+User.find("email LIKE ?1", "%@gmail.com"); // shorthand
+User.find("email LIKE :email", Parameters.with("email", "%@gmail.com"));
+```
+
+**Native SQL:**
+```java
+User.find("SELECT * FROM users WHERE age > ?1", Sort.by("name"), 18);
+```
+
+For complex updates or deletes:
+```java
+User.update("name = ?1 WHERE age < ?2", "NewName", 18);
+User.delete("age < ?1", 18);
+```
+
+---
+
+### 9. How do you handle transactions with Panache?
+
+**Answer:**  
+Use the `@Transactional` annotation (from `jakarta.transaction.Transactional` or `io.quarkus.transaction`) on your service method.
+
+```java
+@ApplicationScoped
+public class UserService {
+    @Transactional
+    public void createUser(User user) {
+        user.persist();   // for Active Record
+        // or userRepository.persist(user); for Repository
+    }
+}
+```
+
+**Note:** In Quarkus 3.9+, transactions are **imperative** – they run on a worker thread. For reactive code (Hibernate Reactive), you cannot use `@Transactional`; you must use the reactive transaction API (`withTransaction`).
+
+---
+
+### 10. How does Panache work with Hibernate Reactive (reactive Panache)?
+
+**Answer:**  
+Quarkus provides `quarkus-hibernate-reactive-panache` extension. The API is the same, but methods return `Uni` or `Multi`.
+
+**Active Record (reactive):**
+```java
+@Entity
+public class User extends PanacheEntity {
+    // ...
+}
+
+// Usage
+Uni<User> user = User.<User>findById(id);
+Multi<User> allUsers = User.streamAll();
+```
+
+**Repository (reactive):**
+```java
+@ApplicationScoped
+public class UserRepository implements PanacheRepository<User> {
+    public Uni<User> findByName(String name) {
+        return find("name", name).firstResult();
+    }
+}
+```
+
+**⚠️ Important:** Reactive Panache is **non‑blocking** and runs on the event loop. Do not mix blocking code (e.g., `list()`) inside reactive pipelines – use `list()` on a worker thread with `@Blocking` or use streaming (`stream()`).
+
+---
+
+### 11. What are the key differences between Panache and plain JPA/Hibernate?
+
+| Aspect | Plain JPA | Panache |
+| :--- | :--- | :--- |
+| Boilerplate | High (EntityManager, TypedQuery) | Low (static methods or repository) |
+| Query API | JPQL strings, Criteria API | Fluent DSL, simplified JPQL |
+| Pagination | Manual (setFirstResult, setMaxResults) | Built‑in `.page()` |
+| Projection | DTO constructors, `SELECT NEW` | `.project()` with reflection‑free DTOs |
+| Lazy loading | Works but needs care | Panache entities are fully loaded by default (avoid proxies, simpler for REST) |
+| Native image support | Requires configuration | Panache is build‑time optimized – reflection is handled automatically |
+
+---
+
+### 12. How do you test Panache entities/repositories in Quarkus?
+
+**Answer:**  
+Use `@QuarkusTest` and `@Transactional` in tests to roll back changes.
+
+```java
+@QuarkusTest
+public class UserRepositoryTest {
+    @Inject
+    UserRepository repository;
+
+    @Test
+    @Transactional
+    public void testPersistAndFind() {
+        User user = new User();
+        user.name = "Test";
+        repository.persist(user);
+
+        User found = repository.findById(user.id);
+        assertEquals("Test", found.name);
+    }
+}
+```
+
+For test databases, Quarkus's **Dev Services** automatically starts a test container (e.g., PostgreSQL) when you run tests, so you don't need to configure a separate database.
+
+---
+
+### 13. What are the limitations of Panache?
+
+**Answer:**
+
+- Panache entities are **fully loaded** by default – no lazy proxies. This means large object graphs may cause performance issues if not handled with projections or `@JsonIgnore`.
+- It does not support all JPA advanced features out of the box (e.g., `@Version` for optimistic locking works, but some obscure Hibernate features may not be integrated).
+- **Reactive Panache** does not support `@Transactional` – you need reactive transaction APIs.
+- It may not be suitable for extremely complex domain models where you need tight control over the persistence layer.
+
+Nevertheless, for 90% of microservices, Panache is more than sufficient.
+
+---
+
+### 14. How does Panache handle relationships (@OneToMany, @ManyToOne)?
+
+**Answer:**  
+Panache works seamlessly with JPA annotations. You define relationships as usual:
+
+```java
+@Entity
+public class Order extends PanacheEntity {
+    @ManyToOne
+    public User user;
+    // ...
+}
+```
+
+When you fetch an order, you can access `order.user` – but beware of eager loading (by default, `@ManyToOne` is `EAGER`, `@OneToMany` is `LAZY`). Panache does **not** force proxies, so you might need to use `@JsonIgnore` or DTO projections to avoid serialization loops.
+
+---
+
+### 15. How does Panache integrate with Quarkus's build‑time optimizations?
+
+**Answer:**  
+Panache entities are analyzed at build time. Quarkus generates bytecode for common operations (like `findById`, `persist`) directly into the entity class, eliminating reflection and runtime proxy creation. This makes Panache **native‑friendly** – you don't need to add `@RegisterForReflection` for your entities when using Panache.
+
+Additionally, Hibernate ORM metadata is pre‑processed, reducing startup time significantly.
+
+---
+
+### 16. Can you combine Active Record and Repository patterns in the same project?
+
+**Answer:**  
+Yes, you can. They are not mutually exclusive. You might have some entities using Active Record for simple CRUD and others using repositories for complex business logic. Both can coexist and even reference each other. Just be consistent within a bounded context to avoid confusion.
+
+---
+
+### 17. How do you handle optimistic locking with Panache?
+
+**Answer:**  
+Add a `@Version` field:
+
+```java
+@Entity
+public class Product extends PanacheEntity {
+    public String name;
+    @Version
+    public Long version;
+}
+```
+
+When you update and persist, Hibernate checks the version. Panache does not interfere with this JPA feature.
+
+---
+
+### 18. What is the difference between `list()` and `stream()` in Panache?
+
+**Answer:**
+
+- **`list()`** – returns a `List` of all results. All entities are loaded into memory at once (blocking or non‑blocking, depending on the context).
+- **`stream()`** – returns a `Stream` that can be processed lazily (only available in **blocking** Panache). In **reactive** Panache, `streamAll()` returns a `Multi` that emits entities as they are fetched, allowing backpressure and streaming large result sets without loading everything into memory.
+
+Use `list()` for small result sets and `stream()`/`Multi` for large datasets.
+
+---
+
+### 19. How do you use DTO projections with Panache?
+
+**Answer:**  
+Use the `.project()` method:
+
+```java
+public class UserDto {
+    public String name;
+    public String email;
+    // constructor or public fields
+}
+
+List<UserDto> dtos = User.find("age > 18")
+                         .project(UserDto.class)
+                         .list();
+```
+
+Panache uses constructor mapping (if available) or field mapping. It is reflection‑free and optimized for native images.
+
+---
+
+### 20. What are the dependencies needed for Panache in Quarkus 3.9+?
+
+**Blocking (ORM):**
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-hibernate-orm-panache</artifactId>
+</dependency>
+```
+
+**Reactive (Hibernate Reactive):**
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-hibernate-reactive-panache</artifactId>
+</dependency>
+```
+
+You also need a database driver (e.g., PostgreSQL, H2) and a datasource configured.
+
+---
+
+### Summary of Key Panache Concepts for Interviews
+
+- **Two patterns**: Active Record (`PanacheEntity`) vs Repository (`PanacheRepository`).
+- **Simplified queries**: `find()`, `list()`, `stream()`, pagination, projections.
+- **Reactive support**: `Uni`/`Multi` with Hibernate Reactive Panache.
+- **Transactions**: `@Transactional` for blocking; reactive transaction API for reactive.
+- **Build‑time optimizations**: Native‑friendly, minimal reflection.
+- **Testability**: Easy with `@QuarkusTest` and Dev Services.
+
+
+
+

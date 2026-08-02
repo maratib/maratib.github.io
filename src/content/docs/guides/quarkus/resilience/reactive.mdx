@@ -1,0 +1,469 @@
+---
+title: Reactive Error Recovery in Mutiny
+description: Guides on Quarkus resilience including fault tolerance, retry, circuit breaker, and bulkhead.
+sidebar:
+  order: 1
+  label: Reactive Error Recovery in Mutiny
+---
+
+- Deep dive into `onFailure().recoverWithItem()`, `retry()`, `fallback strategies`, and `timeout handling` in reactive pipelines.
+
+### 1. What are the core error recovery operators in Mutiny?
+
+**Answer:** Mutiny provides a rich set of operators to handle failures gracefully. The core recovery operators are:
+
+**On `Uni` (single result stream):**
+- **`onFailure().recoverWithItem(T item)`** – Replaces the failure with a static fallback value.
+- **`onFailure().recoverWithUni(Supplier<Uni<T>>)`** – Replaces the failure by invoking another asynchronous operation.
+- **`onFailure().retry()`** – Retries the failed operation with optional retry policies.
+- **`onFailure().fallbackTo(Uni<T>)`** – An alias for `recoverWithUni` (legacy, still works).
+
+**On `Multi` (stream of multiple items):**
+- **`onFailure().recoverWithItems(T... items)`** – Replaces the failure with static items.
+- **`onFailure().recoverWithMulti(Supplier<Multi<T>>)`** – Replaces the failure with another asynchronous stream.
+- **`onFailure().retry()`** – Retries the entire stream on failure.
+
+**General operators:**
+- **`onFailure().invoke(Consumer<Throwable>)`** – Executes a side effect (e.g., logging) when a failure occurs, without changing the failure.
+- **`onFailure().recoverWithNull()`** – Replaces the failure with a `null` value (use with caution).
+- **`onFailure().transformToUni()`** – Transforms the failure into a Uni with more complex logic.
+
+---
+
+### 2. How do you implement a simple fallback value when a REST client call fails?
+
+**Answer:** Use `onFailure().recoverWithItem()`:
+
+```java
+@GET
+@Path("/{id}")
+public Uni<User> getUser(@PathParam("id") Long id) {
+    return userClient.getUser(id)
+        .onFailure()
+        .recoverWithItem(new User("Guest", "guest@example.com"));
+}
+```
+
+If `userClient.getUser(id)` fails (e.g., due to network timeout or 404), the fallback user is returned.
+
+---
+
+### 3. How do you implement an asynchronous fallback (calling another service) when the primary fails?
+
+**Answer:** Use `onFailure().recoverWithUni()`:
+
+```java
+public Uni<User> getUserWithFallback(Long id) {
+    return primaryUserService.getUser(id)
+        .onFailure()
+        .recoverWithUni(() -> fallbackUserService.getUser(id));
+}
+```
+
+If the primary service fails, Mutiny invokes the fallback service. The fallback itself can also fail, and you can chain further error handling.
+
+---
+
+### 4. How do you retry a failed operation in Mutiny?
+
+**Answer:** Use `onFailure().retry()`:
+
+**Basic retry with default settings:**
+```java
+public Uni<User> getUserWithRetry(Long id) {
+    return userClient.getUser(id)
+        .onFailure()
+        .retry();
+}
+```
+
+**Retry with specific settings:**
+```java
+public Uni<User> getUserWithRetry(Long id) {
+    return userClient.getUser(id)
+        .onFailure()
+        .retry()
+        .atMost(3)                  // max 3 attempts (including initial)
+        .withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(10))  // exponential backoff
+        .onFailure().retry();      // note the nested retry
+}
+```
+
+Wait, the correct syntax is:
+
+```java
+public Uni<User> getUserWithRetry(Long id) {
+    return userClient.getUser(id)
+        .onFailure()
+        .retry()
+        .atMost(3)  // retry up to 3 times (initial + 2 retries)
+        .withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(10))
+        .withJitter(0.5);
+}
+```
+
+---
+
+### 5. What is the difference between `retry().atMost(3)` and `retry().indefinitely()`?
+
+**Answer:**
+
+- **`retry().atMost(3)`** – Retries up to 3 times. If all attempts fail, the original failure is propagated. **Recommended for production.**
+- **`retry().indefinitely()`** – Retries forever until the operation succeeds or the application is stopped. **Use with extreme caution** – can lead to infinite loops, resource exhaustion, and undetected failures.
+
+Always set a `maxDuration` when using indefinite retries:
+```java
+.onFailure().retry().indefinitely()
+    .withBackOff(Duration.ofSeconds(1), Duration.ofMinutes(5))
+    .withMaxDuration(Duration.ofMinutes(10)); // stops retrying after 10 minutes
+```
+
+---
+
+### 6. Can you combine `retry()` and `recoverWithItem()` in the same pipeline? What is the execution order?
+
+**Answer:** Yes, you can combine them. The execution order is:
+
+1. **`retry()`** attempts to re‑execute the operation.
+2. If all retries fail, **`recoverWithItem()`** is invoked to provide a fallback.
+
+Example:
+```java
+public Uni<User> getUser(Long id) {
+    return userClient.getUser(id)
+        .onFailure().retry().atMost(3)
+        .onFailure().recoverWithItem(new User("Fallback"));
+}
+```
+
+The fallback is only used after retries are exhausted.
+
+---
+
+### 7. How do you implement a timeout in Mutiny and recover from it?
+
+**Answer:** Use `ifNoItem().after()` or `timeout()`:
+
+```java
+public Uni<User> getUserWithTimeout(Long id) {
+    return userClient.getUser(id)
+        .ifNoItem().after(Duration.ofSeconds(5))
+        .fail()  // emits a TimeoutException
+        .onFailure(TimeoutException.class)
+        .recoverWithItem(new User("Timeout fallback"));
+}
+```
+
+Alternatively, with `timeout()`:
+```java
+public Uni<User> getUserWithTimeout(Long id) {
+    return userClient.getUser(id)
+        .timeout(Duration.ofSeconds(5))
+        .onFailure(TimeoutException.class)
+        .recoverWithItem(new User("Timeout fallback"));
+}
+```
+
+`timeout()` fails the Uni if the operation exceeds the duration. `ifNoItem().after()` specifically triggers when no item is emitted within the time window (more precise for streams).
+
+---
+
+### 8. What is the difference between `onFailure().recoverWithItem()` and `onFailure().recoverWithUni()`?
+
+**Answer:**
+
+| Aspect | `recoverWithItem(T)` | `recoverWithUni(Supplier<Uni<T>>)` |
+| :--- | :--- | :--- |
+| **Fallback type** | Synchronous – immediate static value | Asynchronous – invokes a Uni operation |
+| **Use case** | Simple fallback values (e.g., default user) | Complex recovery (e.g., call backup service) |
+| **When it executes** | Immediately when failure occurs | Immediately when failure occurs, but returns a Uni |
+| **Example** | `recoverWithItem(new User("Guest"))` | `recoverWithUni(() -> backupService.getUser(id))` |
+
+---
+
+### 9. How do you handle specific exception types differently in Mutiny?
+
+**Answer:** Use `onFailure(Class<? extends Throwable>)` to target specific exceptions:
+
+```java
+public Uni<User> getUserWithSpecificHandling(Long id) {
+    return userClient.getUser(id)
+        .onFailure(NotFoundException.class)
+        .recoverWithItem(new User("Not found fallback"))
+        .onFailure(TimeoutException.class)
+        .retry().atMost(3)
+        .onFailure(IOException.class)
+        .recoverWithUni(() -> fallbackService.getUser(id));
+}
+```
+
+In this example:
+- `NotFoundException` → fallback user.
+- `TimeoutException` → retry 3 times.
+- `IOException` → call backup service.
+- Any other exception → propagates as is.
+
+---
+
+### 10. How do you log failures without interrupting the error propagation?
+
+**Answer:** Use `onFailure().invoke()`:
+
+```java
+public Uni<User> getUserWithLogging(Long id) {
+    return userClient.getUser(id)
+        .onFailure()
+        .invoke(throwable -> log.error("Failed to fetch user: {}", throwable.getMessage()))
+        .onFailure()
+        .recoverWithItem(new User("Fallback"));
+}
+```
+
+`invoke()` executes the side effect (logging) and then re‑emits the failure downstream. It does **not** consume or recover the failure.
+
+---
+
+### 11. How do you handle errors in a `Multi` stream when one item fails?
+
+**Answer:** In a `Multi`, an error event terminates the stream by default. To recover and continue, use `onFailure().recoverWithMulti()`:
+
+```java
+public Multi<User> streamUsers() {
+    return userRepository.streamAll()
+        .onFailure()
+        .recoverWithMulti(() -> Multi.createFrom().items(fallbackUser1, fallbackUser2));
+}
+```
+
+**⚠️ Caution:** `recoverWithMulti()` replaces the entire stream. If you want to skip the problematic item and continue, use `onFailure().onItem().skip()` or `onFailure().onItem().recoverWithItem()`:
+
+```java
+// Skip items that cause errors
+userRepository.streamAll()
+    .onItem().transformToUniAndMerge(user -> processUser(user)
+        .onFailure().recoverWithItem(null))
+    .filter(Objects::nonNull);
+```
+
+---
+
+### 12. What is the difference between `onFailure().retry().atMost(3)` on a `Uni` vs a `Multi`?
+
+**Answer:**
+
+- **On `Uni`** – Retries the entire operation up to 3 times. If the operation fails, it restarts from scratch.
+- **On `Multi`** – Retries the entire stream (from the beginning) up to 3 times. If the stream fails after emitting some items, those items are lost on retry (the stream restarts). This can cause duplicates in the output if the source is not idempotent.
+
+**Best practice:** Use retries on `Multi` only when the source is idempotent and you can tolerate duplicates or restarts.
+
+---
+
+### 13. How do you implement an exponential backoff with jitter in Mutiny?
+
+**Answer:** Use `withBackOff()` and `withJitter()`:
+
+```java
+public Uni<User> getUserWithBackoff(Long id) {
+    return userClient.getUser(id)
+        .onFailure()
+        .retry()
+        .atMost(5)
+        .withBackOff(Duration.ofSeconds(1), Duration.ofSeconds(30))
+        .withJitter(0.5);  // 50% jitter to avoid thundering herd
+}
+```
+
+This retries with delays: 1s → 2s → 4s → 8s → 16s (plus random jitter up to 50%).
+
+---
+
+### 14. What is the `@CircuitBreaker` annotation in MicroProfile Fault Tolerance and how does it relate to Mutiny error recovery?
+
+**Answer:** `@CircuitBreaker` (from SmallRye Fault Tolerance) is a declarative annotation that wraps the entire method invocation and provides circuit breaker functionality. It works with both blocking and reactive (`Uni`/`Multi`) methods.
+
+**Relationship with Mutiny operators:**
+- `@CircuitBreaker` operates at the **method invocation level** – it wraps the whole `Uni`/`Multi` pipeline.
+- Mutiny operators (`onFailure()`) operate at the **pipeline level** – they give you finer control inside the stream.
+
+You can combine them:
+```java
+@CircuitBreaker(failureRatio = 0.5, requestVolumeThreshold = 10)
+public Uni<User> getUserWithCircuitBreaker(Long id) {
+    return userClient.getUser(id)
+        .onFailure()
+        .recoverWithItem(new User("Fallback"));
+}
+```
+
+If the circuit is OPEN, the method fails with `CircuitBreakerOpenException`, which you can recover from inside the pipeline.
+
+---
+
+### 15. How do you test error recovery logic in Mutiny?
+
+**Answer:** Use `@QuarkusTest` with controlled failures:
+
+**Testing retry:**
+```java
+@QuarkusTest
+public class UserServiceTest {
+    @InjectMock
+    UserClient userClient;
+
+    @Test
+    public void testRetry() {
+        // Fail twice, then succeed
+        when(userClient.getUser(1L))
+            .thenReturn(Uni.createFrom().failure(new IOException()))
+            .thenReturn(Uni.createFrom().failure(new IOException()))
+            .thenReturn(Uni.createFrom().item(new User("John")));
+
+        Uni<User> result = userService.getUserWithRetry(1L);
+        User user = result.await().atMost(Duration.ofSeconds(5));
+        assertEquals("John", user.name);
+        verify(userClient, times(3)).getUser(1L);
+    }
+}
+```
+
+**Testing fallback:**
+```java
+@Test
+public void testFallback() {
+    when(userClient.getUser(1L))
+        .thenReturn(Uni.createFrom().failure(new NotFoundException()));
+
+    User user = userService.getUserWithFallback(1L)
+        .await().atMost(Duration.ofSeconds(5));
+
+    assertEquals("Fallback", user.name);
+}
+```
+
+---
+
+### 16. What is the difference between `onFailure().recoverWithItem()` and `fallbackTo()`?
+
+**Answer:** `fallbackTo()` is an older alias for `recoverWithUni()` and is still available for compatibility. In newer Mutiny versions, the recommended method is `recoverWithUni()`. `fallbackTo()` may be deprecated in future versions.
+
+**Use:**
+```java
+// Legacy (still works)
+.onFailure().fallbackTo(() -> fallbackService.getUser(id))
+
+// Modern (recommended)
+.onFailure().recoverWithUni(() -> fallbackService.getUser(id))
+```
+
+---
+
+### 17. How do you handle failures in a reactive pipeline that includes side effects (`invoke`, `call`)?
+
+**Answer:** Side effect operators (`invoke`, `call`) execute their action when the stream is successful. If the side effect itself fails, the failure is propagated downstream unless you recover within the side effect.
+
+**Example – logging side effect failing:**
+```java
+public Uni<User> getUser(Long id) {
+    return userClient.getUser(id)
+        .onItem().invoke(user -> log.info("Fetched user: {}", user.name))
+        // If log.info() throws an unchecked exception, the Uni fails
+        .onFailure()
+        .recoverWithItem(new User("Fallback"));
+}
+```
+
+If the side effect is risky, wrap it in a try-catch:
+```java
+.onItem().invoke(user -> {
+    try {
+        riskyOperation();
+    } catch (Exception e) {
+        log.warn("Side effect failed", e);
+        // Do NOT rethrow if you want to continue
+    }
+})
+```
+
+For asynchronous side effects, use `call()` and recover inside the `Uni`.
+
+---
+
+### 18. What is the `onFailure().transformToUni()` operator and when would you use it?
+
+**Answer:** `onFailure().transformToUni()` allows you to transform a failure into a `Uni` using the exception itself. It gives you access to the failure details and lets you produce a new `Uni` (which can be an item, another failure, or an asynchronous operation).
+
+**Use case:** Returning a custom error response based on the failure type.
+
+```java
+public Uni<Response> getUserResponse(Long id) {
+    return userClient.getUser(id)
+        .map(user -> Response.ok(user).build())
+        .onFailure()
+        .transformToUni(throwable -> {
+            if (throwable instanceof NotFoundException) {
+                return Uni.createFrom().item(Response.status(404).entity("Not found").build());
+            } else if (throwable instanceof TimeoutException) {
+                return Uni.createFrom().item(Response.status(504).entity("Timeout").build());
+            }
+            return Uni.createFrom().item(Response.status(500).entity("Internal error").build());
+        });
+}
+```
+
+---
+
+### 19. What are the common pitfalls with error recovery in Mutiny?
+
+**Answer:**
+
+- **Recovering too early** – Using `recoverWithItem()` before retries means the fallback is triggered on the first failure, skipping retry logic.
+- **Swallowing exceptions** – Recovering with a fallback without logging the original error makes debugging difficult.
+- **Retrying non-idempotent operations** – Retrying a `POST` (non-idempotent) can cause duplicate data. Use retries only on idempotent operations (GET, DELETE, idempotent PUT/PATCH).
+- **Infinite retries** – `retry().indefinitely()` without `maxDuration` can cause indefinite loops. Always set a limit.
+- **Forgetting to handle specific exceptions** – If you recover only from `IOException`, other exceptions (e.g., `NullPointerException`) will propagate.
+- **Blocking inside reactive pipeline** – Using `Thread.sleep()` or blocking IO inside error recovery will block the event loop. Use `runSubscriptionOn` or `@Blocking`.
+- **Not propagating context** – `@RequestScoped` beans may not be available in recovery pipelines. Use `@ApplicationScoped` or propagate context explicitly.
+
+---
+
+### 20. How do you handle errors gracefully in a REST endpoint using Mutiny?
+
+**Answer:** A comprehensive error handling strategy:
+
+```java
+@GET
+@Path("/{id}")
+public Uni<Response> getUser(@PathParam("id") Long id) {
+    return userService.getUser(id)
+        .map(user -> Response.ok(user).build())
+        .onFailure(NotFoundException.class)
+        .recoverWithItem(Response.status(404).entity("User not found").build())
+        .onFailure(TimeoutException.class)
+        .retry().atMost(3)
+        .onFailure(TimeoutException.class) // if retries still fail
+        .recoverWithItem(Response.status(504).entity("Service timeout").build())
+        .onFailure()
+        .invoke(throwable -> log.error("Unexpected error", throwable))
+        .onFailure()
+        .recoverWithItem(Response.status(500).entity("Internal server error").build());
+}
+```
+
+This handles:
+- 404: returns 404.
+- Timeout: retries 3 times, then returns 504.
+- Any other error: logs and returns 500.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Operator | Purpose | Key Methods |
+| :--- | :--- | :--- |
+| `onFailure().recoverWithItem()` | Synchronous fallback value | `recoverWithItem(T)` |
+| `onFailure().recoverWithUni()` | Asynchronous fallback (call another service) | `recoverWithUni(Supplier<Uni<T>>)` |
+| `onFailure().retry()` | Retry the operation | `atMost(int)`, `withBackOff()`, `withJitter()`, `withMaxDuration()` |
+| `onFailure().invoke()` | Execute side effect on failure | `invoke(Consumer<Throwable>)` |
+| `onFailure().transformToUni()` | Transform failure into a new Uni | `transformToUni(Function<Throwable, Uni<T>>)` |
+| `ifNoItem().after().fail()` | Timeout | `after(Duration)`, `fail()` |
+| `onFailure().recoverWithMulti()` | Replace a failed Multi stream | `recoverWithMulti(Supplier<Multi<T>>)` |

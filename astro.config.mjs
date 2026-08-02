@@ -470,7 +470,76 @@ export default defineConfig({
         {
           label: "Quarkus",
           collapsed: true,
-          autogenerate: { directory: "guides/quarkus", collapsed: true },
+          items: [
+            { label: "Mastering Quarkus", slug: "guides/quarkus/mastering-quarkus" },
+            { label: "Add Lombok", slug: "guides/quarkus/add-lombok" },
+            { label: "Annotations", slug: "guides/quarkus/annotations" },
+            {
+              label: "Getting Started",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/getting-started", collapsed: true },
+            },
+            {
+              label: "REST",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/rest", collapsed: true },
+            },
+            {
+              label: "Persistence",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/persistence", collapsed: true },
+            },
+            {
+              label: "Communication",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/communication", collapsed: true },
+            },
+            {
+              label: "Security",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/security", collapsed: true },
+            },
+            {
+              label: "Observability",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/observability", collapsed: true },
+            },
+            {
+              label: "Resilience",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/resilience", collapsed: true },
+            },
+            {
+              label: "Configuration",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/configuration", collapsed: true },
+            },
+            {
+              label: "Testing",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/testing", collapsed: true },
+            },
+            {
+              label: "Deployment",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/deployment", collapsed: true },
+            },
+            {
+              label: "Messaging",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/messaging", collapsed: true },
+            },
+            {
+              label: "Exceptions",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/exceptions", collapsed: true },
+            },
+            {
+              label: "Internals",
+              collapsed: true,
+              autogenerate: { directory: "guides/quarkus/internals", collapsed: true },
+            },
+          ],
         },
         {
           label: "Starlight",

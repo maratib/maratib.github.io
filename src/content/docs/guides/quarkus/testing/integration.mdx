@@ -1,0 +1,453 @@
+---
+title: Integration Testing with @QuarkusTest
+description: Guides on Quarkus testing including QuarkusTest, Dev Services, mocking, and integration tests.
+sidebar:
+  order: 1
+  label: Integration Testing
+---
+
+**Integration Testing with @QuarkusTest** 
+- Mocking beans with `@InjectMock`, overriding properties with `@TestProfile`, and using Dev Services.
+
+### 1. What is `@QuarkusTest` and how does it differ from standard JUnit tests?
+
+**Answer:** `@QuarkusTest` is a JUnit 5 extension that starts the Quarkus application (with a random port) before running your tests and shuts it down afterward. Unlike standard unit tests that mock everything, `@QuarkusTest` runs the **full** application stack, including CDI, the HTTP server, and database connections (with Dev Services). This provides true integration testing, validating that your components work together correctly. The application is started once per test class (or per test method, depending on configuration), making it efficient for integration testing.
+
+---
+
+### 2. What is the difference between `@QuarkusTest` and `@QuarkusIntegrationTest`?
+
+**Answer:**
+
+| Aspect | `@QuarkusTest` | `@QuarkusIntegrationTest` |
+| :--- | :--- | :--- |
+| **Execution mode** | Runs in the same JVM as the test runner (JVM mode) | Runs against an already built artifact (JAR or native image) |
+| **Startup** | Starts the Quarkus application in-process | Launches the application as a separate process (or container) |
+| **Native testing** | Not for native; tests run in JVM mode | The primary way to test native executables |
+| **Speed** | Faster (in-process, no process/container overhead) | Slower (requires building the artifact first) |
+| **Use case** | Daily development, unit/integration tests | CI/CD, validating the final artifact before deployment |
+
+`@QuarkusIntegrationTest` is essential for testing the **native image** and ensuring it behaves identically to the JVM version. For `@QuarkusIntegrationTest`, the test does not have direct access to the application's internal beans (they are in a separate process), so you use HTTP clients (like RestAssured) to interact with the running app.
+
+---
+
+### 3. How do you test REST endpoints using `@QuarkusTest` and RestAssured?
+
+**Answer:** RestAssured is integrated by default. You write tests like:
+
+```java
+@QuarkusTest
+public class UserResourceTest {
+    @Test
+    public void testGetUser() {
+        given()
+            .when().get("/api/users/1")
+            .then()
+            .statusCode(200)
+            .body("name", equalTo("John"));
+    }
+
+    @Test
+    public void testCreateUser() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(new User("Alice", "alice@example.com"))
+            .when().post("/api/users")
+            .then()
+            .statusCode(201)
+            .body("id", notNullValue());
+    }
+}
+```
+
+RestAssured automatically uses the random port assigned by `@QuarkusTest`.
+
+---
+
+### 4. How do you mock a CDI bean in a `@QuarkusTest`?
+
+**Answer:** Use `@InjectMock` (from `io.quarkus.test.InjectMock`) to replace a bean with a Mockito mock:
+
+```java
+@QuarkusTest
+public class UserServiceTest {
+    @InjectMock
+    UserRepository userRepository;
+
+    @Inject
+    UserService userService;
+
+    @Test
+    public void testFindUser() {
+        Mockito.when(userRepository.findById(1L))
+               .thenReturn(Optional.of(new User("Mocked")));
+
+        User user = userService.getUser(1L);
+        assertEquals("Mocked", user.name);
+    }
+}
+```
+
+**Key points:**
+- The mock is applied globally for the test class (or method if using `@InjectMock` with scoping).
+- You can use Mockito's `verify()` to check interactions.
+- For REST client mocks, use `@InjectMock` with `@RestClient` qualifier.
+
+---
+
+### 5. What is `@InjectSpy` and when would you use it instead of `@InjectMock`?
+
+**Answer:** `@InjectSpy` creates a spy (partial mock) of the bean, allowing you to call real methods but also stub and verify specific interactions:
+
+```java
+@InjectSpy
+UserService userService;
+
+@Test
+public void testPartialMock() {
+    // Call real method, but spy on it
+    userService.getUser(1L);
+    verify(userService).getUser(1L);
+}
+```
+
+Use `@InjectSpy` when you want to execute the real implementation but monitor calls or stub only specific methods while keeping the rest intact. `@InjectMock` replaces the entire bean with a mock.
+
+---
+
+### 6. How do you override configuration properties for a specific test?
+
+**Answer:** Use `@TestProfile` to define a configuration profile for the test:
+
+```java
+@QuarkusTest
+@TestProfile(TestProfile.class)
+public class ConfigTest {
+    @ConfigProperty(name = "app.greeting")
+    String greeting;
+
+    @Test
+    public void testGreeting() {
+        assertEquals("Hello from test", greeting);
+    }
+
+    public static class TestProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of("app.greeting", "Hello from test");
+        }
+    }
+}
+```
+
+You can also override properties per test method using `@TestPropertySource` (not available) – instead, use `@QuarkusTestProfile` or system properties. For simpler overrides, you can set them in `application.properties` with the `%test.` prefix:
+
+```properties
+%test.quarkus.datasource.jdbc.url=jdbc:h2:mem:testdb
+```
+
+---
+
+### 7. What are Dev Services and how do they help with integration testing?
+
+**Answer:** Dev Services automatically starts and configures containers (e.g., PostgreSQL, Kafka, Redis) in development and test modes. When you run `@QuarkusTest`, Dev Services spins up the necessary containers (if the extension is present) without any manual configuration. This gives you a real, ephemeral database for tests, ensuring your tests run against a production-like environment.
+
+**Benefits:**
+- Zero configuration – just add the extension.
+- Isolated – each test run gets a fresh container.
+- Fast – containers are reused when possible.
+
+To disable Dev Services in tests:
+```properties
+%test.quarkus.devservices.enabled=false
+```
+
+---
+
+### 8. How do you test transactional behavior in `@QuarkusTest`?
+
+**Answer:** Use `@Transactional` on the test method or class, but be aware that changes persist to the database. To roll back changes after each test, use `@TestTransaction` (from Quarkus), which automatically rolls back the transaction:
+
+```java
+@QuarkusTest
+public class TransactionTest {
+    @Inject
+    UserService userService;
+
+    @Test
+    @TestTransaction
+    public void testCreateUser() {
+        userService.createUser("John");
+        assertEquals(1, User.count());
+        // Transaction is rolled back after test
+    }
+}
+```
+
+Alternatively, use `@Transactional` with `TransactionManager.setRollbackOnly()`, but `@TestTransaction` is the recommended approach.
+
+---
+
+### 9. How do you test security (OIDC/JWT) in `@QuarkusTest`?
+
+**Answer:** Use `@TestSecurity` and `@OidcSecurity` annotations:
+
+```java
+@QuarkusTest
+public class SecureResourceTest {
+    @Test
+    @TestSecurity(user = "alice", roles = {"admin", "user"})
+    public void testAdminEndpoint() {
+        given().when().get("/api/admin")
+               .then().statusCode(200);
+    }
+
+    @Test
+    @TestSecurity(user = "bob", roles = {"user"})
+    public void testAdminEndpointForbidden() {
+        given().when().get("/api/admin")
+               .then().statusCode(403);
+    }
+}
+```
+
+`@TestSecurity` mocks the `SecurityIdentity` without contacting a real OIDC provider. For more complex OIDC interactions, use `@OidcSecurity` to mock the OIDC server responses.
+
+---
+
+### 10. How do you test reactive endpoints that return `Uni`/`Multi` in `@QuarkusTest`?
+
+**Answer:** If you're calling the REST endpoint via RestAssured, you test the HTTP response normally – the reactive nature is hidden behind the HTTP layer. If you're testing a service directly (not via HTTP), you must await the `Uni`:
+
+```java
+@QuarkusTest
+public class ReactiveServiceTest {
+    @Inject
+    ReactiveUserService service;
+
+    @Test
+    public void testReactiveService() {
+        User user = service.getUser(1L)
+            .await().atMost(Duration.ofSeconds(5));
+        assertEquals("John", user.name);
+    }
+}
+```
+
+For `Multi`, you can collect items using `.collect().asList()` and await:
+
+```java
+List<User> users = service.getAllUsers()
+    .collect().asList()
+    .await().atMost(Duration.ofSeconds(5));
+```
+
+---
+
+### 11. What is `@QuarkusTestResource` and when do you use it?
+
+**Answer:** `@QuarkusTestResource` allows you to manage external resources (like databases, message brokers, or custom test containers) that are needed for your tests. It works with `QuarkusTestResourceLifecycleManager`, which provides lifecycle hooks to start/stop the resource.
+
+**Example with Testcontainers:**
+```java
+@QuarkusTest
+@QuarkusTestResource(PostgresTestResource.class)
+public class DatabaseTest { ... }
+
+public class PostgresTestResource implements QuarkusTestResourceLifecycleManager {
+    @Override
+    public Map<String, String> start() {
+        // Start PostgreSQL container and return config properties
+        return Map.of("quarkus.datasource.jdbc.url", container.getJdbcUrl());
+    }
+
+    @Override
+    public void stop() {
+        // Stop container
+    }
+}
+```
+
+Dev Services often eliminate the need for manual `@QuarkusTestResource` because they auto-start containers.
+
+---
+
+### 12. How do you run tests with a specific profile (e.g., `dev`, `prod`)?
+
+**Answer:** The `%test` profile is automatically active when running `@QuarkusTest`. To use a different profile, you can set the `quarkus.profile` system property:
+
+```bash
+./mvnw test -Dquarkus.profile=staging
+```
+
+Or programmatically in the test class using `@TestProfile` and overriding `getConfigProfile()`:
+
+```java
+public static class CustomProfile implements QuarkusTestProfile {
+    @Override
+    public String getConfigProfile() {
+        return "staging";
+    }
+}
+```
+
+---
+
+### 13. How do you test REST Clients in `@QuarkusTest`?
+
+**Answer:** You can mock the REST client using `@InjectMock` with `@RestClient`, or use a real WireMock server.
+
+**Mocking the client:**
+```java
+@QuarkusTest
+public class UserClientTest {
+    @InjectMock
+    @RestClient
+    UserClient client;
+
+    @Test
+    public void testClient() {
+        Mockito.when(client.getUser(1L))
+               .thenReturn(Uni.createFrom().item(new User("Mocked")));
+
+        User user = client.getUser(1L).await().indefinitely();
+        assertEquals("Mocked", user.name);
+    }
+}
+```
+
+**Using WireMock (real HTTP):**
+```java
+@QuarkusTest
+@QuarkusTestResource(WireMockExtension.class)
+public class UserClientWireTest {
+    @Inject
+    @RestClient
+    UserClient client;
+
+    @Test
+    public void testWireMock() {
+        stubFor(get("/users/1").willReturn(okJson("{\"name\":\"John\"}")));
+        User user = client.getUser(1L).await().indefinitely();
+        assertEquals("John", user.name);
+    }
+}
+```
+
+---
+
+### 14. How do you test `@Transactional` methods in `@QuarkusTest` without committing to the real database?
+
+**Answer:** Use `@TestTransaction` to roll back automatically. Alternatively, configure the test to use a test database (e.g., H2) that can be wiped between tests. You can also use `@Transactional` with `TransactionManager.setRollbackOnly()` programmatically:
+
+```java
+@Inject
+UserTransaction tx;
+
+@Test
+public void testWithRollback() throws Exception {
+    tx.begin();
+    // do work
+    tx.setRollbackOnly();
+    tx.commit(); // rollback occurs
+}
+```
+
+However, `@TestTransaction` is the simplest and recommended approach.
+
+---
+
+### 15. What is the purpose of `@QuarkusTest`'s `@TestInstance(Lifecycle.PER_CLASS)`?
+
+**Answer:** By default, JUnit 5 creates a new test instance per method (`PER_METHOD`). With `@QuarkusTest`, Quarkus starts the application once per test class and reuses it across test methods. If you need to control the instance lifecycle, you can use `@TestInstance(Lifecycle.PER_CLASS)` to share state between test methods, but be cautious about test isolation. Quarkus tests are typically designed to be independent.
+
+---
+
+### 16. How do you test `@Startup` and `@PostConstruct` logic in `@QuarkusTest`?
+
+**Answer:** Since `@QuarkusTest` runs the full application lifecycle, startup logic is automatically executed. You can test side effects by injecting the bean and asserting its state:
+
+```java
+@QuarkusTest
+public class StartupTest {
+    @Inject
+    CacheWarmer warmer;
+
+    @Test
+    public void testCacheWarmed() {
+        assertTrue(warmer.isCacheReady());
+        // Or check that cache was populated
+    }
+}
+```
+
+If your startup logic involves external calls, you may need to mock those dependencies or use `@TestProfile` to override configurations that affect startup.
+
+---
+
+### 17. How do you run a subset of tests or skip slow tests in Quarkus?
+
+**Answer:** Use JUnit 5 tags:
+
+```java
+@Test
+@Tag("integration")
+public void slowIntegrationTest() { ... }
+```
+
+Then run with:
+```bash
+./mvnw test -Dgroups="integration"
+./mvnw test -DexcludedGroups="integration"
+```
+
+You can also use `@QuarkusTest` with `@Disabled` to skip entire test classes.
+
+---
+
+### 18. What are the common pitfalls when writing `@QuarkusTest`?
+
+**Answer:**
+
+- **Test pollution** – Tests that modify shared state (e.g., database, static variables) can affect other tests. Use `@TestTransaction` to roll back changes, or reset state in `@BeforeEach`.
+- **Slow startup** – `@QuarkusTest` starts the application, which can be slow (especially with Dev Services). Use `@QuarkusTest` sparingly for true integration tests; use mocks for unit tests.
+- **Not using `@TestTransaction`** – Changes to the database persist across tests, causing flaky tests. Always roll back or use a clean database.
+- **Mocking too much** – Overusing `@InjectMock` can make tests brittle and defeat the purpose of integration testing. Mock only external dependencies; test the internal logic against the real implementation.
+- **Forgetting to `await()`** – In reactive tests, you must `await()` the `Uni`/`Multi`; otherwise, the test may pass prematurely or fail with a timeout.
+- **`@QuarkusTest` with `@Profile`** – Not all profiles are supported; `%test` is active by default. For custom profiles, use `@TestProfile`.
+- **Threading issues** – In reactive tests, be aware that operations may run on different threads. Use `await()` or `subscribe()` correctly.
+
+---
+
+### 19. How do you test `@QuarkusTest` in a CI/CD pipeline efficiently?
+
+**Answer:**
+- Use **Dev Services** to auto-start containers; this eliminates manual setup.
+- Use **testcontainers** if Dev Services aren't sufficient.
+- Use **`@QuarkusIntegrationTest`** in CI for native image validation.
+- Use **surefire/failsafe** plugins to separate unit tests (`@Test` without `@QuarkusTest`) from integration tests (`@QuarkusTest`).
+- Set appropriate timeouts for `@QuarkusTest` to avoid hanging; set `quarkus.test.continuous-testing` to disable if needed.
+- Use **parallel test execution** cautiously, as `@QuarkusTest` starts a single application instance; parallel tests may interfere. Use `@QuarkusTest` with `@TestInstance(Lifecycle.PER_CLASS)` carefully.
+
+---
+
+### 20. How do you test across multiple modules or services in Quarkus?
+
+**Answer:** For multi-module projects, use `@QuarkusTest` in each module with its own database (via Dev Services). For cross-service integration, you can use **WireMock** or **Testcontainers** to mock external services. If you need a full end-to-end test, consider using `@QuarkusIntegrationTest` with Docker Compose or Kubernetes to spin up all services. However, for most cases, mocking external dependencies in `@QuarkusTest` is sufficient and faster.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **`@QuarkusTest`** | Full application startup, in-process JVM, integration testing |
+| **`@QuarkusIntegrationTest`** | Tests built artifact (JAR or native), separate process |
+| **Mocking** | `@InjectMock` (mock), `@InjectSpy` (spy) |
+| **Config overrides** | `@TestProfile`, `%test.` prefix in `application.properties` |
+| **Database isolation** | `@TestTransaction` (rolls back), Dev Services (fresh container) |
+| **Security testing** | `@TestSecurity` (mock user/roles), `@OidcSecurity` |
+| **Reactive testing** | `.await().atMost()` for `Uni`, `.collect().asList().await()` for `Multi` |
+| **External resources** | `@QuarkusTestResource` with `QuarkusTestResourceLifecycleManager` |
+| **Testing REST endpoints** | RestAssured (auto-configures random port) |
+| **Common pitfalls** | State pollution, forgetting `await()`, over-mocking, slow startup |

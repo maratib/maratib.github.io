@@ -1,0 +1,69 @@
+---
+title: Service Discovery & Load Balancing
+description: Guides on Quarkus communication including REST clients, Kafka, messaging, and reactive streams.
+sidebar:
+  order: 4
+  label: Service Discovery
+---
+
+- Integrating with Kubernetes services or Consul for dynamic endpoint resolution.
+
+### 1. The Challenge: Dynamic Endpoints
+
+In traditional monolithic apps, services have static addresses (IP + port) known at deployment time. In Kubernetes, however, container IPs are ephemeral and change frequently as pods are restarted or scaled .
+
+As one developer put it, "Microservices don't need static configurations for backend apps because Kubernetes dynamically and automatically handles service discovery, load balancing, and self-healing."
+
+### 2. Kubernetes' Built-in Service Discovery
+
+**Service (ClusterIP)** – The foundation of service discovery within a Kubernetes cluster. You don't need a separate discovery system, as each service gets a stable ClusterIP and DNS name, and Kubernetes' kube-proxy handles load balancing across pod replicas, so external applications don't need to know which specific pod they're accessing .
+
+However, Kubernetes service discovery is server-side (kube-proxy) and doesn't offer client-side load-balancing with fine-grained control (like retries, circuit breakers, etc.) within your application code .
+
+### 3. Advanced Client-Side Discovery with SmallRye Stork
+
+**SmallRye Stork** is Quarkus's built-in solution for client-side service discovery and load balancing. It works with the Quarkus REST Client Reactive and gRPC extensions to let your application discover service instances dynamically and pick one via a load balancer .
+
+Stork consists of:
+- **Service Discovery**: Queries a registry (Consul, Kubernetes, etc.) to get a list of available `ServiceInstances` (addresses) 
+- **Load Balancer**: Chooses a single `ServiceInstance` for each call (built-in strategies include round-robin, random, least-requests) 
+
+**Enabling Stork:**
+1. Add dependencies for your preferred discovery mechanism (e.g., `stork-service-discovery-consul`) .
+2. Use the `stork://` URI scheme in your REST Client `baseUri`: `@RegisterRestClient(baseUri = "stork://my-rest-service")` .
+3. Configure in `application.properties` to specify discovery type and load balancer. For Consul, you'd configure `stork.my-rest-service.service-discovery=consul` and `stork.my-rest-service.load-balancer=round-robin` .
+
+### 4. Automatic Service Registration with Stork
+
+Quarkus can also automatically register and deregister your service with registries like Consul using Stork's automatic registration feature .
+
+**How it works:** When the `stork-service-registration-consul` dependency is present, Quarkus performs a build-time check, generates registration metadata, and during startup, the service registers itself automatically (using application name, detected IP, and HTTP port) and deregisters on shutdown .
+
+**No configuration required:**
+```xml
+<dependency>
+  <groupId>io.smallrye.stork</groupId>
+  <artifactId>stork-service-registration-consul</artifactId>
+</dependency>
+```
+
+**Explicit configuration for overrides:** You can fine-tune settings per service:
+```properties
+quarkus.stork.my-service.service-registrar.ip-address=192.168.0.42
+quarkus.stork.my-service.service-registrar.port=8083
+quarkus.stork.my-service.service-registrar.parameters.health-check-url=/q/health/live
+quarkus.stork.my-service.service-registrar.parameters.health-check-interval=10s
+```
+
+### 5. Summary Comparison
+
+| Approach | Discovery Mechanism | Load Balancing | Registration |
+| :--- | :--- | :--- | :--- |
+| **Kubernetes Native** | Built-in DNS + ClusterIP | Server-side (kube-proxy) | Auto via Kubernetes Services |
+| **SmallRye Stork** | Service registry (Consul, etc.) | Client-side (round-robin, etc.) | Auto via Stork integration |
+
+### 6. Common Pitfalls
+
+- **IP Detection in Containers:** In Docker/Kubernetes, automatic IP detection may result in internal IPs that are not externally reachable. Explicitly set `ip-address` and `port` in production .
+- **Forgetting Configuration:** Without proper Stork config, the client won't know how to discover services. Ensure you set `service-discovery=consul` or another mechanism.
+- **Health Check Configuration:** Consul uses health checks to determine if a service instance is healthy. If not configured correctly, instances may be deregistered, causing service discovery to return unavailable instances .

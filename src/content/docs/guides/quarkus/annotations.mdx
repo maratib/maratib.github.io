@@ -1,0 +1,280 @@
+---
+title: Quarkus annotations
+description: A guide on how to use annotations in Quarkus.
+date: 2026-08-01
+tags:
+  - quarkus
+  - annotations
+sidebar:
+  order: 2221
+---  
+
+# 1. CDI (Dependency Injection)
+
+| Annotation           | Purpose                      | Example                                   |
+| -------------------- | ---------------------------- | ----------------------------------------- |
+| `@Inject`            | Inject dependency            | `@Inject UserService service;`            |
+| `@ApplicationScoped` | One instance for application | `@ApplicationScoped class UserService {}` |
+| `@Singleton`         | Singleton bean               | `@Singleton class ConfigService {}`       |
+| `@RequestScoped`     | One bean per request         | `@RequestScoped class RequestContext {}`  |
+| `@SessionScoped`     | One bean per session         | `@SessionScoped class ShoppingCart {}`    |
+| `@Dependent`         | Default scope                | `@Dependent class Helper {}`              |
+| `@Named`             | Named bean                   | `@Named("paypal")`                        |
+| `@Produces`          | Produce custom bean          | `@Produces DataSource ds()`               |
+| `@Disposes`          | Cleanup produced bean        | `void close(@Disposes Connection c)`      |
+| `@Alternative`       | Alternative implementation   | `@Alternative class MockService {}`       |
+| `@Priority`          | Activate alternative         | `@Priority(1)`                            |
+| `@Qualifier`         | Custom bean qualifier        | `@OnlinePayment`                          |
+| `@PostConstruct`     | Initialization               | `void init()`                             |
+| `@PreDestroy`        | Cleanup                      | `void destroy()`                          |
+
+---
+
+# 2. REST Endpoints
+
+| Annotation     | Purpose          | Example                         |
+| -------------- | ---------------- | ------------------------------- |
+| `@Path`        | REST path        | `@Path("/users")`               |
+| `@GET`         | HTTP GET         | `@GET`                          |
+| `@POST`        | HTTP POST        | `@POST`                         |
+| `@PUT`         | HTTP PUT         | `@PUT`                          |
+| `@DELETE`      | HTTP DELETE      | `@DELETE`                       |
+| `@PATCH`       | HTTP PATCH       | `@PATCH`                        |
+| `@Produces`    | Response type    | `@Produces(JSON)`               |
+| `@Consumes`    | Request type     | `@Consumes(JSON)`               |
+| `@PathParam`   | URL variable     | `get(@PathParam("id") Long id)` |
+| `@QueryParam`  | Query parameter  | `?page=1`                       |
+| `@HeaderParam` | Header value     | `@HeaderParam("Authorization")` |
+| `@CookieParam` | Cookie           | `@CookieParam("token")`         |
+| `@BeanParam`   | Aggregate params | `UserRequest request`           |
+| `@FormParam`   | Form field       | `@FormParam("name")`            |
+
+---
+
+# 3. REST Providers
+
+| Annotation                | Purpose           | Example                                 |
+| ------------------------- | ----------------- | --------------------------------------- |
+| `@Provider`               | Register provider | `@Provider class Mapper`                |
+| `ExceptionMapper<T>`      | Handle exceptions | `implements ExceptionMapper<Exception>` |
+| `ContainerRequestFilter`  | Before request    | `implements ContainerRequestFilter`     |
+| `ContainerResponseFilter` | Before response   | `implements ContainerResponseFilter`    |
+| `ReaderInterceptor`       | Read request body | `implements ReaderInterceptor`          |
+| `WriterInterceptor`       | Modify response   | `implements WriterInterceptor`          |
+
+---
+
+# 4. CDI Events
+
+| Annotation       | Purpose                | Example                            |
+| ---------------- | ---------------------- | ---------------------------------- |
+| `Event<T>`       | Fire event             | `event.fire(order)`                |
+| `@Observes`      | Observe synchronously  | `onCreate(@Observes Order o)`      |
+| `@ObservesAsync` | Observe asynchronously | `onCreate(@ObservesAsync Order o)` |
+
+---
+
+# 5. Application Lifecycle
+
+| Annotation      | Purpose                | Example                             |
+| --------------- | ---------------------- | ----------------------------------- |
+| `@Startup`      | Create bean at startup | `@Startup class CacheLoader {}`     |
+| `StartupEvent`  | Application started    | `onStart(@Observes StartupEvent e)` |
+| `ShutdownEvent` | Application stopping   | `onStop(@Observes ShutdownEvent e)` |
+
+---
+
+# 6. Configuration
+
+| Annotation        | Purpose         | Example                            |
+| ----------------- | --------------- | ---------------------------------- |
+| `@ConfigProperty` | Inject property | `@ConfigProperty(name="app.name")` |
+| `@ConfigMapping`  | Typed config    | `interface AppConfig {}`           |
+| `@WithDefault`    | Default value   | `@WithDefault("8080")`             |
+
+---
+
+# 7. Transactions
+
+| Annotation           | Purpose              | Example                               |
+| -------------------- | -------------------- | ------------------------------------- |
+| `@Transactional`     | Transaction boundary | `@Transactional save()`               |
+| `@TransactionScoped` | Transaction scope    | `@TransactionScoped class Context {}` |
+
+---
+
+# 8. Hibernate ORM
+
+| Annotation        | Purpose               | Example                  |
+| ----------------- | --------------------- | ------------------------ |
+| `@Entity`         | Database entity       | `@Entity class User {}`  |
+| `@Table`          | Table mapping         | `@Table(name="users")`   |
+| `@Id`             | Primary key           | `@Id Long id;`           |
+| `@GeneratedValue` | Auto-generated ID     | `@GeneratedValue`        |
+| `@Column`         | Column mapping        | `@Column(name="email")`  |
+| `@OneToMany`      | One-to-many relation  | `List<Order> orders;`    |
+| `@ManyToOne`      | Many-to-one relation  | `User owner;`            |
+| `@OneToOne`       | One-to-one relation   | `Profile profile;`       |
+| `@ManyToMany`     | Many-to-many relation | `Set<Role> roles;`       |
+| `@Version`        | Optimistic locking    | `@Version Long version;` |
+
+### Panache
+
+| Class               | Purpose            | Example                              |
+| ------------------- | ------------------ | ------------------------------------ |
+| `PanacheEntity`     | Active Record      | `class User extends PanacheEntity`   |
+| `PanacheRepository` | Repository pattern | `implements PanacheRepository<User>` |
+
+---
+
+# 9. Validation
+
+| Annotation  | Purpose          | Example                       |
+| ----------- | ---------------- | ----------------------------- |
+| `@Valid`    | Validate object  | `create(@Valid UserDto dto)`  |
+| `@NotNull`  | Cannot be null   | `@NotNull String name;`       |
+| `@NotBlank` | Cannot be blank  | `@NotBlank String email;`     |
+| `@Size`     | Size limits      | `@Size(min=3,max=20)`         |
+| `@Email`    | Email format     | `@Email`                      |
+| `@Pattern`  | Regex validation | `@Pattern(...)`               |
+| `@Min`      | Minimum          | `@Min(18)`                    |
+| `@Max`      | Maximum          | `@Max(100)`                   |
+| `@Positive` | Positive value   | `@Positive BigDecimal price;` |
+
+---
+
+# 10. Security
+
+| Annotation       | Purpose              | Example                  |
+| ---------------- | -------------------- | ------------------------ |
+| `@RolesAllowed`  | Restrict by role     | `@RolesAllowed("admin")` |
+| `@PermitAll`     | Allow everyone       | `@PermitAll`             |
+| `@DenyAll`       | Deny everyone        | `@DenyAll`               |
+| `@Authenticated` | Logged-in users only | `@Authenticated`         |
+
+---
+
+# 11. Scheduler
+
+| Annotation   | Purpose          | Example                   |
+| ------------ | ---------------- | ------------------------- |
+| `@Scheduled` | Run periodically | `@Scheduled(every="10s")` |
+
+---
+
+# 12. Reactive Messaging
+
+| Annotation   | Purpose           | Example                  |
+| ------------ | ----------------- | ------------------------ |
+| `@Incoming`  | Consume messages  | `@Incoming("orders")`    |
+| `@Outgoing`  | Produce messages  | `@Outgoing("processed")` |
+| `@Channel`   | Inject channel    | `@Channel("orders")`     |
+| `@Broadcast` | Broadcast message | `@Broadcast`             |
+| `@Merge`     | Merge streams     | `@Merge`                 |
+
+---
+
+# 13. Cache
+
+| Annotation            | Purpose      | Example                                  |
+| --------------------- | ------------ | ---------------------------------------- |
+| `@CacheResult`        | Cache result | `@CacheResult(cacheName="users")`        |
+| `@CacheInvalidate`    | Remove cache | `@CacheInvalidate(cacheName="users")`    |
+| `@CacheInvalidateAll` | Clear cache  | `@CacheInvalidateAll(cacheName="users")` |
+| `@CacheKey`           | Cache key    | `@CacheKey String id`                    |
+
+---
+
+# 14. Fault Tolerance
+
+| Annotation        | Purpose                | Example                              |
+| ----------------- | ---------------------- | ------------------------------------ |
+| `@Retry`          | Retry failed calls     | `@Retry(maxRetries=3)`               |
+| `@Timeout`        | Timeout                | `@Timeout(500)`                      |
+| `@CircuitBreaker` | Stop repeated failures | `@CircuitBreaker`                    |
+| `@Fallback`       | Alternative method     | `@Fallback(fallbackMethod="backup")` |
+| `@Bulkhead`       | Limit concurrency      | `@Bulkhead(5)`                       |
+| `@Asynchronous`   | Async execution        | `@Asynchronous`                      |
+
+---
+
+# 15. Metrics
+
+| Annotation | Purpose          | Example    |
+| ---------- | ---------------- | ---------- |
+| `@Counted` | Count calls      | `@Counted` |
+| `@Timed`   | Measure duration | `@Timed`   |
+| `@Gauge`   | Current value    | `@Gauge`   |
+
+---
+
+# 16. OpenAPI
+
+| Annotation     | Purpose           | Example                            |
+| -------------- | ----------------- | ---------------------------------- |
+| `@Operation`   | API documentation | `@Operation(summary="Get User")`   |
+| `@APIResponse` | Response docs     | `@APIResponse(responseCode="200")` |
+| `@Parameter`   | Parameter docs    | `@Parameter(name="id")`            |
+| `@Schema`      | Model docs        | `@Schema(description="User")`      |
+| `@Tag`         | API grouping      | `@Tag(name="Users")`               |
+
+---
+
+# 17. Health Checks
+
+| Annotation   | Purpose       | Example                              |
+| ------------ | ------------- | ------------------------------------ |
+| `@Readiness` | Ready probe   | `@Readiness`                         |
+| `@Liveness`  | Alive probe   | `@Liveness`                          |
+| `@Startup`   | Startup probe | `@Startup` (on a `HealthCheck` bean) |
+
+---
+
+# 18. Reactive Routes (Vert.x)
+
+| Annotation | Purpose      | Example                 |
+| ---------- | ------------ | ----------------------- |
+| `@Route`   | HTTP route   | `@Route(path="/hello")` |
+| `@Body`    | Request body | `@Body JsonObject body` |
+
+---
+
+# 19. Testing
+
+| Annotation          | Purpose             | Example                                 |
+| ------------------- | ------------------- | --------------------------------------- |
+| `@QuarkusTest`      | Integration test    | `@QuarkusTest class UserTest`           |
+| `@InjectMock`       | Mock bean           | `@InjectMock UserService`               |
+| `@TestHTTPEndpoint` | Target endpoint     | `@TestHTTPEndpoint(UserResource.class)` |
+| `@TestHTTPResource` | Inject endpoint URL | `@TestHTTPResource URL url`             |
+
+---
+
+# 20. Quarkus Extension Development
+
+| Annotation   | Purpose                | Example                      |
+| ------------ | ---------------------- | ---------------------------- |
+| `@BuildStep` | Build-time step        | `@BuildStep void feature()`  |
+| `@Recorder`  | Runtime recorder       | `@Recorder class MyRecorder` |
+| `@Record`    | Record runtime actions | `@Record(STATIC_INIT)`       |
+
+---
+
+## Most Frequently Used (90% of Real Projects)
+
+| Area            | Core Building Blocks                                              |
+| --------------- | ----------------------------------------------------------------- |
+| CDI             | `@Inject`, `@ApplicationScoped`, `@Singleton`, `@Produces`        |
+| REST            | `@Path`, `@GET`, `@POST`, `@Consumes`, `@Produces`                |
+| Events          | `Event<T>`, `@Observes`, `@ObservesAsync`                         |
+| Configuration   | `@ConfigProperty`, `@ConfigMapping`                               |
+| Persistence     | `@Entity`, `@Transactional`, `PanacheEntity`, `PanacheRepository` |
+| Validation      | `@Valid`, `@NotNull`, `@Size`                                     |
+| Security        | `@RolesAllowed`, `@Authenticated`                                 |
+| Caching         | `@CacheResult`, `@CacheInvalidate`                                |
+| Messaging       | `@Incoming`, `@Outgoing`                                          |
+| Scheduling      | `@Scheduled`                                                      |
+| Fault Tolerance | `@Retry`, `@CircuitBreaker`, `@Fallback`                          |
+| Observability   | `@Timed`, `@Counted`                                              |
+| Testing         | `@QuarkusTest`, `@InjectMock`                                     |
+

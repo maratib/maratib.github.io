@@ -1,0 +1,69 @@
+---
+title: Build-Time vs. Runtime Processing 2
+description: Guides on Quarkus internals including CDI, ArC, build-time processing, and extension development.
+sidebar:
+  order: 2
+  label: Build-Time 2
+---
+
+- Understanding how Quarkus moves computation to build time, and how ArC (CDI) works differently from traditional CDI.
+
+### Core Philosophy: Shift-Left (Moving Work to Build Time)
+
+The central idea behind Quarkus is to move as much work as possible from **runtime** to **build time**. This "shift-left" strategy is the foundation of its "supersonic subatomic" performance.
+
+---
+
+### What Happens at Build Time
+
+During the build phase (e.g., `mvn package`), Quarkus performs the following critical tasks:
+
+1.  **Configuration Parsing & Classpath Scanning** – Parses `application.properties` and scans all classes to discover annotations, beans, and other metadata.
+2.  **CDI (Dependency Injection) Graph Resolution** – The ArC container analyzes, validates, and builds the complete dependency injection graph at build time. Invalid injection points cause **build failures** instead of runtime errors.
+3.  **Bytecode Generation & Optimization** – Replaces reflective calls with direct method invocations, generates CDI proxies and interceptors, and removes unused classes and methods to shrink the application.
+4.  **Native Image Pre‑start (for native compilation)** – Runs parts of the startup code ahead‑of‑time and serializes the state into the native executable, enabling instant startup.
+5.  **Deployment Metadata Generation** – Automatically generates Kubernetes descriptors and other deployment artifacts.
+
+---
+
+### What Remains at Runtime
+
+After build‑time processing, the runtime JVM has significantly less work, but it still handles:
+
+- **Loading Build Output** – Loads the optimized bytecode, metadata, and resources.
+- **Starting the HTTP Server** – Initializes and starts the web server to accept requests.
+- **Exposing Runtime Features** – Provides health checks, metrics, and other out‑of‑the‑box capabilities.
+- **Executing Business Logic** – Processes requests and executes the actual application code.
+
+---
+
+### Build‑Time vs Runtime Configuration: The Crucial Difference
+
+This is a common point of confusion for developers.
+
+| Aspect | Build‑time Configuration | Runtime Configuration |
+| :--- | :--- | :--- |
+| **When applied** | Read during the build phase | Read during application startup (or dynamically) |
+| **Can it change after build?** | **NO** – a rebuild is required | **YES** – can be overridden via env vars, system properties, external files |
+| **Examples** | `quarkus.native.*`, `quarkus.package.type`, `quarkus.kubernetes.*` (many) | `quarkus.http.port`, `quarkus.datasource.jdbc.url`, `quarkus.log.level` |
+| **How to identify** | In the Quarkus docs/IDE, a "lock" icon or a note "build‑time fixed" | No special icon |
+
+**Best Practice**:
+- Set `quarkus.config.build-time-mismatch-at-runtime=fail` to enforce that build‑time properties are not overridden at runtime. This prevents subtle bugs.
+
+---
+
+### ArC: Build‑Time Oriented CDI
+
+ArC is Quarkus's CDI container. Unlike traditional CDI implementations (like Weld) that resolve everything at runtime, ArC resolves injection points and generates proxies **at build time**. This eliminates reflection and proxy‑creation overhead at startup, contributing to the extremely fast startup times.
+
+---
+
+### Summary Table
+
+| Phase | Responsibilities |
+| :--- | :--- |
+| **Build Time** | Config parsing, CDI graph resolution, bytecode generation, native image pre‑start, metadata generation |
+| **Runtime** | Loading artifacts, starting HTTP server, exposing runtime features, executing business logic |
+| **Build‑time Config** | Fixed at build; cannot change without rebuild |
+| **Runtime Config** | Can be overridden at startup (env vars, etc.) |

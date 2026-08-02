@@ -1,0 +1,395 @@
+---
+title: Application Lifecycle & Startup Hooks
+description: Guides on Quarkus lifecycle and startup hooks.
+sidebar:
+  order: 2
+  label: Application Lifecycle
+---
+- Using `@Startup, @Observes, StartupEvent`, and `@PostConstruct` for initialization logic.
+
+### 1. What is the application lifecycle in Quarkus and what phases does it have?
+
+**Answer:** The application lifecycle in Quarkus consists of several distinct phases, from build-time processing to runtime shutdown:
+
+1. **Build-time** – Configuration parsing, bytecode generation, native image compilation (if applicable).
+2. **Runtime initialization** – Loading classes, creating CDI beans, starting the HTTP server.
+3. **Startup** – Application becomes ready to serve requests.
+4. **Runtime** – Serving requests, processing events.
+5. **Shutdown** – Graceful termination, releasing resources.
+
+Quarkus provides hooks to execute custom code at specific points: `@PostConstruct`, `@Observes StartupEvent`, `@Startup`, and `@Observes ShutdownEvent`.
+
+---
+
+### 2. How do you execute code at application startup in Quarkus?
+
+**Answer:** There are three main ways to run code at startup:
+
+1. **`@PostConstruct`** – CDI standard; runs after the bean is constructed and dependencies are injected. This is the simplest approach for per‑bean initialization.
+
+   ```java
+   @ApplicationScoped
+   public class MyService {
+       @PostConstruct
+       void init() {
+           System.out.println("Service initialized");
+       }
+   }
+   ```
+
+2. **`@Observes StartupEvent`** – Runs when the application has started all services.
+
+   ```java
+   @ApplicationScoped
+   public class StartupListener {
+       void onStart(@Observes StartupEvent event) {
+           System.out.println("Application fully started");
+       }
+   }
+   ```
+
+3. **`@Startup`** – Quarkus-specific annotation that marks a bean for eager initialization during startup.
+
+   ```java
+   @Startup
+   @ApplicationScoped
+   public class EagerBean {
+       @PostConstruct
+       void init() {
+           System.out.println("Eagerly initialized");
+       }
+   }
+   ```
+
+---
+
+### 3. What is the `@Startup` annotation and how is it different from `@PostConstruct`?
+
+**Answer:** `@Startup` (from `io.quarkus.runtime.Startup`) is a Quarkus-specific annotation that marks a bean to be initialized **eagerly** during application startup. Without `@Startup`, beans are lazily initialized on first access. With `@Startup`, the bean is instantiated and its `@PostConstruct` method is called immediately when the application starts.
+
+**Difference:**
+- `@PostConstruct` – Called after dependency injection, but only when the bean is actually created. If the bean is lazy, `@PostConstruct` is deferred.
+- `@Startup` – Forces the bean to be created at startup, ensuring `@PostConstruct` runs early.
+
+**Use case:** Pre‑loading caches, warming up connections, registering health checks, etc.
+
+---
+
+### 4. What is the `StartupEvent` and how do you observe it?
+
+**Answer:** `StartupEvent` (from `io.quarkus.runtime.StartupEvent`) is a CDI event fired by Quarkus when the application has completed its startup sequence and is ready to serve requests. You can observe it using the `@Observes` annotation:
+
+```java
+@ApplicationScoped
+public class AppLifecycle {
+    void onStartup(@Observes StartupEvent event) {
+        System.out.println("Application started at: " + Instant.now());
+    }
+}
+```
+
+**Key points:**
+- The event is fired after all beans are constructed and the HTTP server is started.
+- It runs on the main thread (blocking) by default. For async operations, use `Uni` with `@ObservesAsync` (see question 15).
+
+---
+
+### 5. How do you execute code at application shutdown?
+
+**Answer:** Observe the `ShutdownEvent` (from `io.quarkus.runtime.ShutdownEvent`) using `@Observes`:
+
+```java
+@ApplicationScoped
+public class ShutdownListener {
+    void onShutdown(@Observes ShutdownEvent event) {
+        System.out.println("Shutting down...");
+        // Close resources, flush logs, etc.
+    }
+}
+```
+
+**Important:** The shutdown hook runs during a graceful shutdown. It is not guaranteed to run if the JVM crashes or is forcefully killed.
+
+---
+
+### 6. What is the difference between `@PostConstruct` and `@Observes StartupEvent`?
+
+**Answer:**
+
+| Aspect | `@PostConstruct` | `@Observes StartupEvent` |
+| :--- | :--- | :--- |
+| **Timing** | Runs after the bean is created and dependencies injected | Runs after **all** beans are ready and the HTTP server is started |
+| **Order** | Per‑bean, in the order beans are created | Single event, after everything is up |
+| **Dependencies** | May not have access to all services (if they are lazy) | All services are available |
+| **Thread** | Current thread (can be worker or event loop) | Main thread (blocking) |
+| **Use case** | Initialize bean‑specific state | Perform global checks, warm up caches, or start background tasks |
+
+**Recommendation:** Use `@PostConstruct` for internal bean setup; use `StartupEvent` for application‑wide initialization that depends on all services.
+
+---
+
+### 7. How do you perform initialization that depends on configuration or other services?
+
+**Answer:** Injection is fully available in both `@PostConstruct` and `StartupEvent` observers, so you can inject `@ConfigProperty` or other services:
+
+```java
+@ApplicationScoped
+public class CacheWarmer {
+    @ConfigProperty(name = "app.cache.warmup")
+    boolean warmup;
+
+    @Inject
+    CacheService cache;
+
+    void onStart(@Observes StartupEvent event) {
+        if (warmup) {
+            cache.preload();
+        }
+    }
+}
+```
+
+If you need to ensure a certain order, use `@Priority` on observer methods or inject the beans and call them in sequence.
+
+---
+
+### 8. How does Quarkus handle startup in native image versus JVM mode?
+
+**Answer:** In **JVM mode**, startup hooks run at runtime as you'd expect. In **native mode**, some build-time processing occurs: Quarkus analyzes the bytecode and registers necessary reflection. Startup hooks still run at native image runtime, but the image is already built, so the startup overhead is minimal. The main difference is that any code that relies on dynamic class loading or reflection must be properly registered for native (`@RegisterForReflection`). Otherwise, startup hooks work identically in both modes.
+
+---
+
+### 9. Can you use `@Startup` with a parameter to specify order among beans?
+
+**Answer:** Yes, `@Startup` accepts an optional `value` parameter (an integer) to control the order of eager initialization:
+
+```java
+@Startup(100)
+@ApplicationScoped
+public class FirstBean { ... }
+
+@Startup(200)
+@ApplicationScoped
+public class SecondBean { ... }
+```
+
+Lower numbers are initialized first. This is useful when one bean depends on another being initialized first. If no order is specified, the initialization order is not deterministic.
+
+---
+
+### 10. How do you run code after the HTTP server is started but before accepting requests?
+
+**Answer:** `StartupEvent` is fired **after** the HTTP server is started and ready to accept requests. If you need to run code before the server starts, you can use `@Observes @Initialized(ApplicationScoped.class)` – a CDI event that fires when the CDI container is initialized, which happens before the HTTP server starts.
+
+```java
+void onCdiInit(@Observes @Initialized(ApplicationScoped.class) Object event) {
+    System.out.println("CDI container initialized, server not yet started");
+}
+```
+
+However, this event is low‑level and not Quarkus‑specific. For most use cases, `StartupEvent` is sufficient.
+
+---
+
+### 11. What is the `QuarkusApplication` interface and when should you use it?
+
+**Answer:** `QuarkusApplication` (from `io.quarkus.runtime.QuarkusApplication`) is an interface for applications that want full control over the lifecycle, often used in command‑line or batch applications. You implement `run(String... args)` and then launch with `Quarkus.run(MyApp.class, args)`. This is **not** the typical web application approach; it's used for CLI tools or standalone processes. In a REST API application, you generally don't need to implement `QuarkusApplication`.
+
+---
+
+### 12. How do you handle startup failures gracefully (e.g., if a dependency is unavailable)?
+
+**Answer:** If a startup hook throws an exception, Quarkus will fail to start and exit. To handle gracefully:
+
+- **Recover inside the hook** – catch the exception and log a warning, but continue (only if the application can still function).
+- **Use a fallback** – if the dependency is critical, you may want to fail startup (which is the default behavior). You can also implement a health check that reports the dependency as DOWN, so Kubernetes can restart the pod.
+
+```java
+void onStart(@Observes StartupEvent event) {
+    try {
+        externalService.ping();
+    } catch (Exception e) {
+        log.error("External service unavailable, starting anyway", e);
+        // Optionally set a flag for health checks
+    }
+}
+```
+
+---
+
+### 13. What are the build‑time vs runtime initialization phases in Quarkus?
+
+**Answer:** Quarkus moves as much work as possible to **build time** to reduce startup time and memory usage. For example:
+- CDI bean resolution and injection point analysis
+- Bytecode generation for interceptors and decorators
+- Native image compilation
+
+**Runtime initialization** includes:
+- Instantiating beans
+- Calling `@PostConstruct`
+- Firing `StartupEvent`
+- Starting the HTTP server
+
+**Important:** Some configuration properties are build‑time only (e.g., `quarkus.native.*`). You cannot change them at runtime. Check the Quarkus documentation for which properties are build‑time vs runtime.
+
+---
+
+### 14. How do you use `@Observes` with `StartupEvent` and `ShutdownEvent` in a reactive context?
+
+**Answer:** You can use `@ObservesAsync` to handle these events asynchronously:
+
+```java
+@ApplicationScoped
+public class AsyncStartup {
+    void onStart(@ObservesAsync StartupEvent event, CompletionStage<Void> completion) {
+        Uni.createFrom().item(() -> {
+            // async initialization
+            return null;
+        }).subscribe().with(
+            res -> completion.toCompletableFuture().complete(null),
+            err -> completion.toCompletableFuture().completeExceptionally(err)
+        );
+    }
+}
+```
+
+However, the simplest approach for async tasks is to use `@Observes` and call blocking methods, or use `Uni` with `.await().indefinitely()` inside the observer (since the observer runs on the main thread). For true non‑blocking, you might need a custom extension, but it's rarely required.
+
+---
+
+### 15. How do you ensure that a bean is initialized before other beans depend on it?
+
+**Answer:** You can use `@DependsOn` (CDI) or `@Startup` with order values. `@DependsOn` is a standard CDI annotation that declares that one bean must be initialized before another. However, it's not widely used in Quarkus. The recommended approach is:
+- Use `@Startup` on the bean that must be early.
+- If you need strict ordering, use `@Startup(priority)`.
+- Alternatively, inject the dependent bean and call its initialization method explicitly in the `@PostConstruct` of the dependent bean.
+
+```java
+@Startup(1)
+@ApplicationScoped
+public class DatabaseInitializer { ... }
+
+@Startup(2)
+@ApplicationScoped
+public class CacheWarmer { ... }
+```
+
+---
+
+### 16. How do you test startup logic in Quarkus?
+
+**Answer:** Use `@QuarkusTest` – it runs the full startup sequence. To test that your startup hook executed correctly, you can add a static flag or use a test utility:
+
+```java
+@QuarkusTest
+public class StartupTest {
+    @Inject
+    MyStartupBean startupBean; // the bean with startup logic
+
+    @Test
+    public void testStartup() {
+        assertTrue(startupBean.isInitialized());
+        // or check side effects like cache population
+    }
+}
+```
+
+If you need to simulate startup failures, use `@TestProfile` to override configurations that may cause failures, and assert that the test fails appropriately.
+
+---
+
+### 17. What are the common pitfalls with application lifecycle hooks?
+
+**Answer:**
+
+- **Deadlocks** – If you call a blocking operation inside `@PostConstruct` that waits for a resource that isn't available yet, you may deadlock. Use asynchronous patterns or delay the work to `StartupEvent`.
+- **Lazy beans** – If you forget `@Startup`, a bean may be initialized later, causing `@PostConstruct` to run later than expected, leading to missing dependencies.
+- **Exceptions** – An unhandled exception in a startup hook will prevent the application from starting. Always catch and handle, or ensure they are recoverable.
+- **Native image reflection** – If your startup code uses reflection, you must register it with `@RegisterForReflection`.
+- **Using `Thread.sleep` or long‑running tasks** – This blocks the main thread and delays startup. Use asynchronous processing or offload to a worker thread.
+- **Ordering issues** – Without `@Startup(priority)` or `@DependsOn`, the order of bean creation is not guaranteed.
+- **StartupEvent firing after `@PostConstruct`** – If you rely on `StartupEvent` to initialize dependencies, ensure your beans are ready. `StartupEvent` fires after all `@PostConstruct` methods have completed.
+
+---
+
+### 18. How do you conditionally execute startup code based on a profile?
+
+**Answer:** Use `@IfBuildProfile` or `@UnlessBuildProfile` to conditionally include beans or startup logic:
+
+```java
+@ApplicationScoped
+@IfBuildProfile("prod")
+public class ProdStartupTask {
+    @PostConstruct
+    void init() {
+        // Only runs in prod profile
+    }
+}
+```
+
+Alternatively, inside the startup hook, inject `@ConfigProperty` with profile‑specific values and conditionally execute:
+
+```java
+@ConfigProperty(name = "app.init.warmup", defaultValue = "true")
+boolean warmup;
+
+void onStart(@Observes StartupEvent event) {
+    if (warmup) {
+        // warm up
+    }
+}
+```
+
+---
+
+### 19. What is the purpose of `@Initialized` and `@BeforeDestroyed` events in CDI?
+
+**Answer:** These are CDI container lifecycle events:
+- `@Initialized(ApplicationScoped.class)` – fired when the CDI container is initialized (before HTTP server starts).
+- `@BeforeDestroyed(ApplicationScoped.class)` – fired before the container is destroyed (during shutdown).
+
+They are lower‑level than `StartupEvent`/`ShutdownEvent` and are generally not needed in Quarkus applications, unless you need to hook into the CDI container lifecycle specifically. Quarkus's `StartupEvent` and `ShutdownEvent` are more convenient and specific to the application start/stop.
+
+---
+
+### 20. How do you perform a graceful shutdown with custom cleanup in Quarkus?
+
+**Answer:** Observe `ShutdownEvent` and perform cleanup:
+
+```java
+@ApplicationScoped
+public class GracefulShutdown {
+    @Inject
+    DataSource dataSource;
+
+    void shutdown(@Observes ShutdownEvent event) {
+        log.info("Shutting down gracefully...");
+        try {
+            dataSource.close();
+        } catch (Exception e) {
+            log.error("Error closing datasource", e);
+        }
+        // Also release any other resources
+    }
+}
+```
+
+Quarkus also supports a graceful shutdown timeout:
+```properties
+quarkus.shutdown.timeout=30S
+```
+
+If your cleanup takes longer, you can signal completion by using `@ObservesAsync` and completing the `CompletionStage`. Otherwise, Quarkus will wait for the timeout then force shutdown.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Hook | Annotation / Event | Timing | Use Case |
+| :--- | :--- | :--- | :--- |
+| **Bean initialization** | `@PostConstruct` | After bean creation | Internal per‑bean setup |
+| **Eager initialization** | `@Startup` | At application startup | Force creation of a bean early, with optional priority |
+| **Application started** | `@Observes StartupEvent` | After all beans and HTTP server are ready | Global initialization, warm‑up, health checks |
+| **Application shutdown** | `@Observes ShutdownEvent` | During graceful shutdown | Resource cleanup, logging |
+| **CDI container ready** | `@Observes @Initialized(ApplicationScoped.class)` | Before HTTP server starts | Rare, low‑level |
+| **Profile‑conditional** | `@IfBuildProfile`, `@UnlessBuildProfile` | At build time | Include/exclude beans based on profile |

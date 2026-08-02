@@ -1,0 +1,291 @@
+---
+title: CORS & CSRF Protection
+description: Guides on Quarkus security including authentication, authorization, OIDC, JWT, and RBAC.
+sidebar:
+  order: 4
+  label: CORS & CSRF Protection
+---
+
+- Properly configuring cross-origin requests and securing REST APIs in browser environments.
+
+### 1. What is CORS and why is it important for REST APIs?
+
+**Answer:** **Cross-Origin Resource Sharing (CORS)** is a security mechanism implemented by browsers that uses HTTP headers to control how resources on one origin can be requested from a different origin. An "origin" is defined by the scheme (protocol), hostname, and port of a URL.
+
+By default, browsers enforce the **Same-Origin Policy**, which prevents a web page from making requests to a different domain than the one that served it. CORS allows servers to relax this policy by specifying which origins are permitted to access their resources. For REST APIs, enabling CORS is essential when your backend is served from a different domain than your frontend application (e.g., a SPA on `localhost:3000` calling an API on `localhost:8080`).
+
+---
+
+### 2. How do you enable and configure the CORS filter in Quarkus?
+
+**Answer:** The CORS filter in Quarkus is disabled by default. To enforce CORS policies, you enable it in your `application.properties` or `application.yml` file:
+
+```properties
+quarkus.http.cors.enabled=true
+```
+
+**The filter** intercepts all incoming HTTP requests, identifies cross-origin requests, applies the configured policy, and adds the appropriate CORS headers to the HTTP response. For preflight `OPTIONS` requests, the filter returns an HTTP response immediately. For regular requests that violate the policy, it denies access with an **HTTP 403** status.
+
+---
+
+### 3. What are the most important configuration properties for CORS in Quarkus?
+
+**Answer:** The key properties are:
+
+| Property | Description | Default |
+| :--- | :--- | :--- |
+| `quarkus.http.cors.enabled` | Enables the CORS filter | `false` |
+| `quarkus.http.cors.origins` | Allowed origins (comma-separated) | Not set (denies all) |
+| `quarkus.http.cors.methods` | Allowed HTTP methods (e.g., GET,POST,PUT,DELETE) | Any method |
+| `quarkus.http.cors.headers` | Allowed request headers (e.g., X-Custom, Content-Type) | Any header |
+| `quarkus.http.cors.exposed-headers` | Response headers accessible to the client | Not set |
+| `quarkus.http.cors.access-control-max-age` | Preflight cache duration (e.g., `24H`) | Not set |
+| `quarkus.http.cors.access-control-allow-credentials` | Allows cookies/credentials in CORS requests | `false` |
+
+**Example of a complete configuration**:
+```properties
+quarkus.http.cors.enabled=true
+quarkus.http.cors.origins=http://example.com,http://www.example.io,/https://([a-z0-9\\-_]+)\\.app\\.mydomain\\.com/
+quarkus.http.cors.methods=GET,PUT,POST
+quarkus.http.cors.headers=X-Custom
+quarkus.http.cors.exposed-headers=Content-Disposition
+quarkus.http.cors.access-control-max-age=24H
+quarkus.http.cors.access-control-allow-credentials=true
+```
+
+---
+
+### 4. How can you use regular expressions to define allowed origins in Quarkus?
+
+**Answer:** Quarkus allows you to use **regular expressions** to define allowed origins by enclosing the pattern in forward slashes:
+
+```properties
+quarkus.http.cors.origins=/https://([a-z0-9\\-_]+)\\.app\\.mydomain\\.com/
+```
+
+**⚠️ Important:** In an `application.properties` file, you must escape special characters with **four backslashes (`\\\\`)** to ensure proper behavior. For example:
+- `\\\\\\.` matches a literal `.` character.
+- `\\.` matches any single character as a regex metadata character.
+
+Incorrectly escaped patterns can lead to unintended behavior or security vulnerabilities. Always verify your regex syntax before deployment.
+
+---
+
+### 5. How do you allow all origins for development mode only in Quarkus?
+
+**Answer:** Use a **profile-specific configuration** with the `%dev` profile:
+
+```properties
+quarkus.http.cors.enabled=true
+%dev.quarkus.http.cors.origins=/.*/
+```
+
+This allows all origins (`/.*/`) only when running in development mode (`quarkus:dev`). In production, you should **always define explicit origins**.
+
+**⚠️ Warning:** Allowing unrestricted origins (`quarkus.http.cors.origins=*`) in production poses severe security risks, such as unauthorized data access or resource abuse. The only exception might be for **read‑only public APIs** with no side effects.
+
+---
+
+### 6. What is the difference between `quarkus.http.cors.origins` using `*` and using explicit origins with credentials?
+
+**Answer:** When you use `quarkus.http.cors.origins=*` (wildcard), you **cannot** allow credentials (cookies, authorization headers) in cross-origin requests. The browser will reject the `Access-Control-Allow-Credentials: true` header if the origin is `*`.
+
+To allow credentials, you must specify **explicit origins**:
+```properties
+quarkus.http.cors.origins=https://myapp.com,http://localhost:3000
+quarkus.http.cors.access-control-allow-credentials=true
+```
+
+If you need to match any origin while still allowing credentials, use a **regular expression** that matches all origins (e.g., `/.*/`).
+
+---
+
+### 7. How can you configure CORS programmatically in Quarkus?
+
+**Answer:** Quarkus allows programmatic CORS configuration using the `HttpSecurity` CDI event:
+
+```java
+import io.quarkus.vertx.http.security.HttpSecurity;
+import jakarta.enterprise.event.Observes;
+
+public class CorsProgrammaticConfig {
+    void configure(@Observes HttpSecurity httpSecurity) {
+        httpSecurity.cors("https://example.com");
+    }
+}
+```
+
+For more advanced configurations, use the `CORS` builder:
+```java
+httpSecurity.cors(CORS.builder()
+    .origin("https://example.com")
+    .method("POST")
+    .build());
+```
+
+---
+
+### 8. What is CSRF and how does Quarkus protect against it?
+
+**Answer:** **Cross-Site Request Forgery (CSRF)** is an attack that tricks an authenticated user into executing unwanted actions on a web application without their knowledge or consent. For example, an attacker could craft a malicious website that submits a form to your application using the user's existing session cookie.
+
+Quarkus Security provides a **CSRF prevention feature** that implements the **Double Submit Cookie** technique. It works as follows:
+1. The server generates a cryptographically secure CSRF token and sends it to the client as an `HttpOnly` cookie (optionally signed).
+2. The client must submit this token back in a **hidden form field** (for HTML forms) or as a **request header** (for JavaScript/SPA applications).
+3. The server verifies that the submitted token matches the cookie value before processing the request.
+
+The **CSRF prevention filter** applies to requests using **POST, PUT, PATCH, DELETE**, and other state-changing HTTP methods.
+
+---
+
+### 9. How do you add the CSRF prevention extension to a Quarkus project?
+
+**Answer:** Add the `quarkus-rest-csrf` extension:
+
+```bash
+quarkus ext add rest-csrf
+```
+
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-rest-csrf</artifactId>
+</dependency>
+```
+
+**📝 Note:** An older version was published with the artifact ID `quarkus-csrf-reactive`. For Quarkus 3.9+, use `quarkus-rest-csrf`.
+
+---
+
+### 10. How do you inject a CSRF token into a Qute HTML template?
+
+**Answer:** Use the `{inject:csrf.token}` expression:
+
+```html
+<form action="/service/submit" method="post">
+    <input type="hidden" name="{inject:csrf.parameterName}" value="{inject:csrf.token}" />
+    <input type="text" name="name" />
+    <input type="submit" />
+</form>
+```
+
+The `parameterName` defaults to `csrf-token`, and the token is a cryptographically secure random value. The CSRF filter will verify that the submitted token matches the cookie value.
+
+---
+
+### 11. How do you customize CSRF token header and cookie names in Quarkus?
+
+**Answer:** You can customize the names in `application.properties`:
+```properties
+quarkus.rest-csrf.token-header-name=CUSTOM-X-CSRF-TOKEN
+```
+
+To allow JavaScript to read the CSRF cookie (e.g., to pass it as a header for SPA applications), set:
+```properties
+quarkus.rest-csrf.cookie-http-only=false
+```
+
+You can also inject the cookie and header names in templates using `{inject:csrf.cookieName}` and `{inject:csrf.headerName}`.
+
+---
+
+### 12. How do you restrict CSRF token verification to specific paths and content types?
+
+**Answer:** By default, the CSRF filter verifies tokens for all **state-changing** HTTP methods (POST, PUT, PATCH, DELETE). However, you may want to skip verification for certain paths or media types (e.g., JSON APIs).
+
+Use the following properties to control verification:
+```properties
+# Only verify CSRF token for the `/service/user` path
+quarkus.rest-csrf.create-token-path=/service/user
+
+# Allow non-form-urlencoded payloads on this path (e.g., JSON)
+quarkus.rest-csrf.require-form-url-encoded=false
+```
+
+This is useful when the same path accepts both HTML forms and JSON requests, as CSRF protection is typically only needed for form submissions.
+
+---
+
+### 13. What is the relationship between the CORS filter and CSRF prevention in Quarkus?
+
+**Answer:** The **CORS filter can also help prevent CSRF attacks** through **Origin verification**. Since browsers are expected to set an `Origin` header for cross-origin JavaScript and HTML form requests, the server can verify that the origin matches the target host or is in the list of allowed origins.
+
+The Quarkus documentation suggests that you **might consider using the CORS filter instead of the REST CSRF filter** for CSRF protection. However, you must confirm that the browser sets an `Origin` header for cross-origin requests, especially with HTML forms.
+
+**Key distinction:**
+- **CORS filter** – stateless, works by verifying the `Origin` header.
+- **REST CSRF filter** – stateful, uses the Double Submit Cookie pattern.
+
+For SPAs that exclusively use JavaScript to make API calls, CORS Origin verification may be sufficient. For traditional server‑rendered applications with HTML forms, the dedicated CSRF filter is more appropriate.
+
+---
+
+### 14. How do you test CORS configuration in Quarkus?
+
+**Answer:** You can test CORS using `@QuarkusTest` with RestAssured:
+
+```java
+@QuarkusTest
+public class CorsTest {
+    @Test
+    public void testCorsHeaders() {
+        given()
+            .header("Origin", "http://localhost:3000")
+            .when()
+            .options("/api/users")
+            .then()
+            .statusCode(200)
+            .header("Access-Control-Allow-Origin", "http://localhost:3000")
+            .header("Access-Control-Allow-Methods", containsString("GET"));
+    }
+}
+```
+
+You can also use browser developer tools or `curl` to inspect CORS headers:
+```bash
+curl -H "Origin: http://localhost:3000" -X OPTIONS http://localhost:8080/api/users -v
+```
+
+---
+
+### 15. What are the common pitfalls with CORS and CSRF in Quarkus?
+
+**Answer:**
+
+- **`quarkus.http.cors.origins=*` with credentials** – Using a wildcard origin with `access-control-allow-credentials=true` is not allowed by browsers.
+- **Incorrect regex escaping** – Failing to escape special characters with four backslashes (`\\\\`) in `application.properties` can break origin matching.
+- **Missing `Origin` header** – Some older browsers or non‑browser clients may not send the `Origin` header, making CORS‑based CSRF protection ineffective.
+- **CSRF filter blocking JSON endpoints** – By default, the CSRF filter verifies tokens for all state‑changing methods. Use `create-token-path` and `require-form-url-encoded` to restrict verification.
+- **Self‑invocation bypass** – Like other security annotations, CSRF and CORS filters apply at the HTTP layer, not the CDI layer. They cannot be bypassed through internal method calls.
+- **CORS changing endpoint behavior** – Enabling CORS changes how the server handles preflight `OPTIONS` requests. Ensure your endpoints handle `OPTIONS` correctly or let the CORS filter handle them.
+
+---
+
+### 16. What is the difference between CORS and CSRF protection?
+
+**Answer:**
+
+| Aspect | CORS | CSRF Protection |
+| :--- | :--- | :--- |
+| **Purpose** | Controls which origins can access your API | Prevents unauthorized state‑changing requests from authenticated users |
+| **Mechanism** | Uses HTTP headers (`Access-Control-*`) | Uses tokens (Double Submit Cookie, Origin verification) |
+| **Enforced by** | Browser + Server | Server |
+| **When to use** | When your frontend is on a different origin | When you have state‑changing endpoints (forms, etc.) |
+| **Alternative** | N/A | CORS filter can also prevent CSRF via Origin verification |
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **CORS Extension** | Built‑in, no separate extension needed |
+| **CORS Enabling** | `quarkus.http.cors.enabled=true` |
+| **CORS Origins** | `quarkus.http.cors.origins` – explicit URLs or regex (enclosed in `/ /`) |
+| **CORS with Credentials** | Must use explicit origins, not `*` |
+| **CSRF Extension** | `quarkus-rest-csrf` (add explicitly) |
+| **CSRF Mechanism** | Double Submit Cookie |
+| **CSRF Token in Qute** | `{inject:csrf.token}` |
+| **CSRF Restriction** | `quarkus.rest-csrf.create-token-path` |
+| **CORS for CSRF** | CORS filter can prevent CSRF via Origin verification |

@@ -1,0 +1,232 @@
+---
+title: Server-Sent Events (SSE) & WebSockets
+description: Guides on Quarkus messaging including Kafka, AMQP, reactive messaging, and event-driven patterns.
+sidebar:
+  order: 2
+  label: SSE & WebSockets
+---
+- Building real-time streaming REST endpoints and handling backpressure.
+
+### 1. What are Server-Sent Events (SSE) and how do they differ from WebSockets?
+
+**Answer:** Both technologies enable real-time, server-pushed communication, but they have different use cases and characteristics:
+
+| Aspect | Server-Sent Events (SSE) | WebSockets |
+| :--- | :--- | :--- |
+| **Direction** | **Unidirectional** – Server to client only | **Bidirectional** – Full-duplex, both directions |
+| **Protocol** | HTTP (text/event-stream) | WebSocket protocol (WS/WSS) |
+| **Reconnection** | Automatic (browser built-in) | Manual (requires custom logic) |
+| **Binary Data** | Text only (UTF-8) | Supports binary and text |
+| **Use Case** | Live updates, notifications, stock tickers, news feeds | Chat applications, multiplayer games, collaborative editing |
+| **Simplicity** | Simpler (HTTP-based) | More complex (handshake, frames) |
+| **Quarkus Support** | RESTEasy Reactive + Mutiny `Multi` | `quarkus-websockets` extension |
+
+---
+
+### 2. How do you implement Server-Sent Events (SSE) in Quarkus 3.9+?
+
+**Answer:** SSE is implemented by returning a `Multi` (from Mutiny) from a REST endpoint with `@Produces(MediaType.SERVER_SENT_EVENTS)`:
+
+```java
+@Path("/events")
+@ApplicationScoped
+public class EventResource {
+    @GET
+    @Produces(MediaType.SERVER_SENT_EVENTS)
+    public Multi<String> streamEvents() {
+        return Multi.createFrom().ticks().every(Duration.ofSeconds(1))
+            .map(tick -> "Event " + tick + " at " + Instant.now());
+    }
+}
+```
+
+Each item emitted by the `Multi` is sent as a separate SSE event. The client (browser) uses the EventSource API to consume it.
+
+---
+
+### 3. How do you send structured events with custom event names or IDs?
+
+**Answer:** Use the `ServerSentEvent` wrapper:
+
+```java
+@GET
+@Produces(MediaType.SERVER_SENT_EVENTS)
+public Multi<ServerSentEvent<String>> streamEvents() {
+    return Multi.createFrom().ticks().every(Duration.ofSeconds(1))
+        .map(tick -> ServerSentEvent.<String>builder()
+            .data("Event " + tick)
+            .id("" + tick)
+            .event("custom-event")
+            .comment("This is a comment")
+            .retry(Duration.ofSeconds(10))
+            .build());
+}
+```
+
+The client can listen for `custom-event` events via `addEventListener('custom-event', callback)`.
+
+---
+
+### 4. How does SSE handle backpressure when the client is slow?
+
+**Answer:** SSE uses the HTTP protocol, which doesn't have built-in backpressure mechanisms. If the client is slow, the server continues to buffer messages. To handle this:
+
+- Use `Multi` operators like `onOverflow()` to control behavior:
+```java
+Multi.createFrom().ticks().every(Duration.ofMillis(100))
+    .onOverflow().drop() // Drop events if client can't keep up
+    .onOverflow().buffer(1000) // Buffer up to 1000 events
+```
+- Consider using a limited buffer size to avoid memory issues.
+- Alternatively, let the client reconnect and resume from the last received event ID.
+
+---
+
+### 5. How do you implement WebSockets in Quarkus 3.9+?
+
+**Answer:** Add the `quarkus-websockets` extension:
+
+```bash
+quarkus ext add websockets
+```
+
+Then create a class annotated with `@ServerEndpoint`:
+
+```java
+@ServerEndpoint("/chat")
+@ApplicationScoped
+public class ChatEndpoint {
+    private static final Set<Session> sessions = ConcurrentHashMap.newKeySet();
+
+    @OnOpen
+    public void onOpen(Session session) {
+        sessions.add(session);
+        broadcast("User joined");
+    }
+
+    @OnClose
+    public void onClose(Session session) {
+        sessions.remove(session);
+        broadcast("User left");
+    }
+
+    @OnMessage
+    public void onMessage(String message, Session session) {
+        broadcast("[" + session.getId() + "] " + message);
+    }
+
+    private void broadcast(String message) {
+        sessions.forEach(session -> session.getAsyncRemote().sendText(message));
+    }
+}
+```
+
+The `@OnOpen`, `@OnClose`, `@OnMessage`, and `@OnError` annotations handle the WebSocket lifecycle.
+
+---
+
+### 6. What is the difference between `Session.getBasicRemote()` and `Session.getAsyncRemote()`?
+
+**Answer:**
+
+- **`getBasicRemote()`** – Synchronous, blocking. Each send blocks until the message is sent. Use this for simple scenarios where performance isn't critical. Can throw `IllegalStateException` if multiple sends overlap.
+- **`getAsyncRemote()`** – Asynchronous, non-blocking. Returns a `Future` or `CompletionStage`. Prevents blocking the event loop and is preferred in Quarkus applications for better scalability.
+
+In the example above, `session.getAsyncRemote().sendText(message)` is non-blocking.
+
+---
+
+### 7. How do you handle WebSocket messages with a reactive, non-blocking approach?
+
+**Answer:** Use `@OnMessage` with a `Uni` or `CompletionStage` return type to process messages asynchronously:
+
+```java
+@OnMessage
+public Uni<Void> onMessage(String message, Session session) {
+    return processMessage(message)
+        .onItem().invoke(result -> session.getAsyncRemote().sendText(result))
+        .replaceWithVoid();
+}
+```
+
+The WebSocket framework will not block the event loop while the `Uni` is in progress.
+
+---
+
+### 8. How do you secure WebSocket endpoints in Quarkus?
+
+**Answer:** WebSocket endpoints are secured the same way as REST endpoints using `@RolesAllowed`, `@PermitAll`, or `@DenyAll`:
+
+```java
+@ServerEndpoint("/secure/chat")
+@RolesAllowed("user")
+@ApplicationScoped
+public class SecureChatEndpoint {
+    @OnOpen
+    public void onOpen(Session session) {
+        // Only authenticated users with 'user' role can connect
+    }
+}
+```
+
+Quarkus automatically applies the security interceptor before the `@OnOpen` method is invoked.
+
+---
+
+### 9. How do you test WebSocket endpoints in Quarkus?
+
+**Answer:** You can use `@QuarkusTest` with the Jakarta WebSocket client or the Quarkus test framework:
+
+```java
+@QuarkusTest
+public class WebSocketTest {
+    @Test
+    public void testWebSocket() throws Exception {
+        try (WebSocketContainer container = ContainerProvider.getWebSocketContainer()) {
+            CountDownLatch latch = new CountDownLatch(1);
+            Session session = container.connectToServer(
+                new Endpoint() {
+                    @Override
+                    public void onMessage(String message) {
+                        assertEquals("Hello World", message);
+                        latch.countDown();
+                    }
+                },
+                URI.create("ws://localhost:8080/chat"));
+            session.getBasicRemote().sendText("Hello");
+            assertTrue(latch.await(5, TimeUnit.SECONDS));
+        }
+    }
+}
+```
+
+Alternatively, use the Quarkus test framework's built-in WebSocket client utility.
+
+---
+
+### 10. What are the common pitfalls with SSE and WebSockets in Quarkus?
+
+**Answer:**
+
+- **Forgetting `@ApplicationScoped`** – WebSocket endpoints need to be `@ApplicationScoped` or `@Dependent` to manage state correctly. `@Singleton` works but is rarely needed.
+- **Not handling disconnections** – Clients may disconnect unexpectedly. Always handle `@OnClose` and `@OnError` to clean up resources.
+- **Memory leaks** – In WebSocket broadcast examples, ensure sessions are removed on close to avoid memory leaks.
+- **Blocking in SSE/WebSocket handlers** – Using blocking operations (JDBC, Thread.sleep) will block the event loop. Use `@Blocking` or offload to a worker thread.
+- **Browser restrictions on SSE** – SSE has a maximum number of open connections per browser (usually 6). For many concurrent connections, consider WebSockets or HTTP/2 Server Push.
+- **WebSocket path parameters** – Quarkus supports path parameters in WebSocket endpoints: `@ServerEndpoint("/chat/{roomId}")` and inject with `@PathParam`.
+- **Not using `@OnError`** – Unhandled exceptions in WebSocket handlers will close the connection. Use `@OnError` to log and handle gracefully.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **SSE** | Server to client only, HTTP-based, automatic reconnect, `Multi` + `MediaType.SERVER_SENT_EVENTS` |
+| **WebSockets** | Bidirectional, full-duplex, `quarkus-websockets` extension, `@ServerEndpoint` |
+| **SSE Structured Events** | `ServerSentEvent.builder()` for custom event name, ID, retry |
+| **WebSocket Lifecycle** | `@OnOpen`, `@OnMessage`, `@OnClose`, `@OnError` |
+| **WebSocket Sending** | `Session.getAsyncRemote()` (non-blocking) vs `getBasicRemote()` (blocking) |
+| **Security** | `@RolesAllowed` works on WebSocket `@ServerEndpoint` classes |
+| **Testing** | `@QuarkusTest` with Jakarta WebSocket client |
+| **Blocking Concerns** | Use `@Blocking` or offload to worker threads for blocking operations |

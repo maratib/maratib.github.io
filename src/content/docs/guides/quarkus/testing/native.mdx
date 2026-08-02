@@ -1,0 +1,140 @@
+---
+title: Native Image Testing (@QuarkusIntegrationTest)
+description: Guides on Quarkus testing including QuarkusTest, Dev Services, mocking, and integration tests.
+sidebar:
+  order: 1
+  label: Native Image Testing
+---
+
+**Native Image Testing (@QuarkusIntegrationTest)** 
+- Testing the native executable versus JVM mode, and specific pitfalls to watch for.
+
+### 1. What is `@QuarkusIntegrationTest` and what is its primary purpose?
+
+**Answer:** `@QuarkusIntegrationTest` is a JUnit 5 extension that instructs the Quarkus test harness to test the **packaged artifact** produced by the Quarkus build. Its primary purpose is to validate that the final artifact (a runnable JAR or a native executable) works correctly in an environment that closely mirrors production. It is the essential tool for testing **native executables** in Quarkus.
+
+---
+
+### 2. What is the fundamental difference between `@QuarkusTest` and `@QuarkusIntegrationTest`?
+
+**Answer:** The key difference lies in their execution model:
+
+| Aspect | `@QuarkusTest` | `@QuarkusIntegrationTest` |
+| :--- | :--- | :--- |
+| **Execution Model** | Tests run in the **same JVM** as the application under test. | The application runs in a **separate, external process** (e.g., as a native executable or a JAR). |
+| **Test Scope** | **White-box** tests: Can inject and interact with application beans (`@Inject`). | **Black-box** tests: Interaction is limited to network calls (HTTP, etc.) or inter-process communication. |
+| **Primary Use** | Fast, in-process integration tests during development. | Testing the final, built artifact (JAR or native image) before deployment. |
+
+---
+
+### 3. How do you write a test class for a native executable using `@QuarkusIntegrationTest`?
+
+**Answer:** The recommended approach is to reuse the test logic from your JVM integration tests.
+
+1.  Write your standard integration test using `@QuarkusTest`.
+2.  Create a new test class that extends the JVM test class.
+3.  Annotate the new class with `@QuarkusIntegrationTest`.
+
+```java
+// JVM integration test
+@QuarkusTest
+public class GreetingResourceTest {
+    @Test
+    public void testHelloEndpoint() {
+        given().when().get("/hello").then().statusCode(200);
+    }
+}
+
+// Native executable test
+@QuarkusIntegrationTest
+public class GreetingResourceIT extends GreetingResourceTest {
+    // No test code needed; it inherits all tests from the parent class
+}
+```
+
+By convention, this test class is often named with an `IT` suffix and placed in the `src/test/java` directory.
+
+---
+
+### 4. How do you run tests against a native executable?
+
+**Answer:** You can run the tests using the Maven Failsafe plugin by activating the `native` profile:
+
+```bash
+./mvnw verify -Pnative
+```
+
+This command will build the native executable and then execute all classes annotated with `@QuarkusIntegrationTest` against it.
+
+---
+
+### 5. How can you test an existing native executable without rebuilding it?
+
+**Answer:** You can use Maven to run the integration tests against an already built native image:
+
+```bash
+./mvnw test-compile failsafe:integration-test -Dnative.image.path=<path-to-native-executable>
+```
+
+This allows you to run multiple test suites against the same binary.
+
+---
+
+### 6. What are the limitations of `@QuarkusIntegrationTest` in native mode?
+
+**Answer:** There are several key limitations to be aware of:
+
+*   **Black-box Testing**: You cannot inject application beans (`@Inject`) or interact with the application's internal state. The test and the application are separate processes.
+*   **Inter-Process Communication**: All test interactions must occur over the network (e.g., HTTP/REST) or through other forms of inter-process communication.
+*   **Container Network Access**: If the application is running inside a Docker container, services (like WireMock) running in the test JVM may not be accessible from the container.
+
+---
+
+### 7. How do you configure the startup timeout for a native executable in a test?
+
+**Answer:** By default, Quarkus waits for **60 seconds** for the native image to start before failing the test. You can change this duration using the `quarkus.test.native-image-wait-time` system property.
+
+```bash
+./mvnw verify -Pnative -Dquarkus.test.native-image-wait-time=300
+```
+
+This command sets the timeout to 300 seconds.
+
+---
+
+### 8. Which configuration profile is used when running native tests?
+
+**Answer:** By default, native tests run using the **`prod`** profile. This can be overridden by setting the `quarkus.test.native-image-profile` property.
+
+---
+
+### 9. What is the role of the Maven Failsafe plugin in native testing?
+
+**Answer:** The Maven Failsafe plugin is responsible for running the integration tests (`@QuarkusIntegrationTest`). It retrieves the path to the native executable using the `native.image.path` system property. This is typically configured in the `pom.xml` file.
+
+---
+
+### 10. What are some best practices for native image testing in Quarkus?
+
+**Answer:** Here are some recommended best practices:
+
+*   **Reuse JVM Test Logic**: Extend your `@QuarkusTest` classes with `@QuarkusIntegrationTest` classes to avoid duplicating test code.
+*   **Run Tests Regularly**: Integrate native tests into your CI/CD pipeline using `./mvnw verify -Pnative` to catch issues early.
+*   **Use Test Profiles**: Use `@TestProfile` to adjust configuration for native tests.
+*   **Be Aware of Limitations**: Remember that native tests are black-box tests; use HTTP clients for all interactions.
+*   **Avoid Runtime Reflection**: Ensure that any necessary reflection is registered at build time with `@RegisterForReflection`.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **Annotation** | `@QuarkusIntegrationTest` |
+| **Purpose** | Test the final packaged artifact (JAR or native image) |
+| **Execution** | Application runs in a separate process |
+| **Test Type** | Black-box; only network/IPC communication is possible |
+| **Command to Run** | `./mvnw verify -Pnative` |
+| **Default Timeout** | 60 seconds (`quarkus.test.native-image-wait-time`) |
+| **Default Profile** | `prod` |
+| **Best Practice** | Extend `@QuarkusTest` classes to reuse test logic |

@@ -1,0 +1,87 @@
+---
+title: What is Quarkus?
+description: An introduction to Quarkus — the Kubernetes-native Java framework designed for fast startup and low memory footprint.
+sidebar:
+  order: 1
+  label: What is Quarkus?
+---
+
+- Supersonic, subatomic Java. Built for containers and cloud-native workloads.
+
+### 1. What is Quarkus and why does it exist?
+
+**Answer:**  
+**Quarkus** is a full-stack, Kubernetes-native Java framework built on top of standards like **Jakarta EE**, **MicroProfile**, and **Eclipse Vert.x**. It was created by Red Hat and released in 2019.
+
+Traditional Java frameworks (Spring Boot, JEE) were designed for long-running servers with large memory budgets. Quarkus rethinks this model:
+
+- **Build-time processing** – Configuration, dependency injection wiring, and classpath scanning happen at build time, not startup.
+- **GraalVM native image** – Compile to a native binary with near-instant startup (~10ms) and a tiny memory footprint (~50MB RSS).
+- **Developer joy** – Live reload (`quarkus dev`), unified config, and excellent extension ecosystem.
+
+| Feature | Traditional Java | Quarkus |
+| :--- | :--- | :--- |
+| Startup time (JVM) | 5–15 seconds | ~1 second |
+| Startup time (native) | N/A | ~10ms |
+| Memory footprint | 200–500MB | 50–100MB |
+| Dev mode | Manual restart | Live reload |
+
+---
+
+### 2. What standards and technologies does Quarkus support?
+
+**Answer:**  
+Quarkus is built on well-known, battle-tested standards so existing knowledge transfers directly:
+
+- **Jakarta REST (JAX-RS)** – REST endpoints via `@Path`, `@GET`, `@POST`, etc.
+- **CDI (Contexts and Dependency Injection)** – `@ApplicationScoped`, `@Inject`, `@Produces`.
+- **MicroProfile** – Config, Health, Metrics, Fault Tolerance, OpenAPI, JWT.
+- **Hibernate ORM / Panache** – JPA with a simplified, active-record style API.
+- **Reactive** – Mutiny (`Uni<T>`, `Multi<T>`), Vert.x, Reactive Routes.
+- **SmallRye** implementations – Health, OpenAPI, Fault Tolerance, Reactive Messaging.
+
+---
+
+### 3. What is the difference between JVM mode and native mode?
+
+**Answer:**
+
+| Mode | How it runs | Startup | Memory | Build time |
+| :--- | :--- | :--- | :--- | :--- |
+| **JVM mode** | Standard JVM (HotSpot) | ~1s | ~100–200MB | Fast |
+| **Native mode** | GraalVM native binary | ~10ms | ~50MB | 3–10 min |
+
+- **JVM mode** is used for development and most CI pipelines. Debugging is standard.
+- **Native mode** is used for production containers where cold-start time and memory cost money (e.g., serverless, Kubernetes autoscaling).
+
+Building native: `quarkus build --native` or `./mvnw package -Dnative`.
+
+---
+
+### 4. What is the Quarkus extension system?
+
+**Answer:**  
+Extensions are Quarkus's plugin system. Each extension:
+1. Provides the runtime library (e.g., `quarkus-hibernate-orm`).
+2. Contains a **build-time processor** that pre-computes configuration and wiring.
+
+This means libraries "know" about Quarkus at build time, enabling native compilation without manual reflection registration.
+
+Search and add extensions:
+```bash
+quarkus ext list        # list available extensions
+quarkus ext add hibernate-orm-panache
+quarkus ext add smallrye-openapi
+```
+
+---
+
+### Summary Table
+
+| Concept | Key Point |
+| :--- | :--- |
+| Build-time processing | Wiring happens at build, not startup |
+| Native image | GraalVM compiles to fast, small binary |
+| Standards-based | Jakarta EE + MicroProfile — no lock-in |
+| Extensions | Library + build processor = native-friendly |
+| Dev mode | `quarkus dev` — live reload with no restart |

@@ -1,0 +1,128 @@
+---
+title: GraalVM Native Image Optimization
+description: Guides on Quarkus deployment including Docker, Kubernetes, native image, and GraalVM.
+sidebar:
+  order: 1
+  label: GraalVM Native Image Optimization
+---
+
+- Handling reflection (`@RegisterForReflection`), native resource inclusion, and build-time configuration.
+
+### 1. What is a GraalVM Native Image and what are its primary benefits in Quarkus?
+
+**Answer:** A GraalVM Native Image is a technology that ahead-of-time (AOT) compiles Java bytecode into a standalone, platform-specific executable. This executable includes the application classes, its dependencies, the necessary portions of the JDK, and a minimal virtual machine. For Quarkus applications, this translates to several key benefits:
+- **Instantaneous Startup**: Native images bypass the JVM's startup and warm-up phases, enabling near-instantaneous startup. This is crucial for serverless and containerized environments where applications are frequently started and stopped.
+- **Low Memory Footprint**: Native images consume significantly less memory than their JVM counterparts.
+- **Reduced Container Size**: They allow for the creation of tiny container images, which is a major advantage in Kubernetes and cloud-native deployments.
+
+---
+
+### 2. What is the fundamental optimization challenge when creating a Native Image?
+
+**Answer:** The core challenge stems from GraalVM's **"closed-world assumption"**. The native image builder performs a static analysis of your application's code, constructing a call tree. Any classes, methods, or fields not directly reachable from the entry points are considered "dead code" and are removed to minimize the image's size.
+
+The problem arises with dynamic language features commonly used in Java, such as **reflection**, **resource loading**, **dynamic proxies**, and **JNI**. These features are not part of the static call tree, so the classes and resources they access are often removed. You must explicitly inform the GraalVM builder about these elements so they can be included in the final image.
+
+---
+
+### 3. How do you handle Reflection in a Quarkus Native Image?
+
+**Answer:** To make classes available for reflection in a native image, the standard approach in Quarkus is to use the **`@RegisterForReflection`** annotation.
+
+*   **On your own classes**: Annotate your class directly with `@RegisterForReflection`.
+*   **On third-party classes**: If you cannot modify the source, use the `targets` attribute to register them.
+    ```java
+    import io.quarkus.runtime.annotations.RegisterForReflection;
+
+    @RegisterForReflection(targets = { ExternalClass.class, AnotherExternalClass.class })
+    public class MyReflectionConfiguration { }
+    ```
+*   **For Serialization**: Use the `serialization` attribute to register classes for the Java Serialization API.
+    ```java
+    @RegisterForReflection(targets = { MySerializableClass.class }, serialization = true)
+    public class MySerializationConfig { }
+    ```
+
+**💡 Note**: CDI beans are automatically registered for reflection by Quarkus.
+
+---
+
+### 4. Why aren't classpath resources automatically included in Native Images and how do you include them?
+
+**Answer**: GraalVM does not include any classpath resources in the native executable by default. If your application loads resources (e.g., configuration files, templates), they must be explicitly configured.
+
+*   **`quarkus.native.resources.includes`**: The easiest way to include resources is using glob patterns in your `application.properties`.
+    ```properties
+    quarkus.native.resources.includes=config/*.json,templates/**.html
+    ```
+*   **`resource-config.json`**: For more complex inclusion using regular expressions, create a `resource-config.json` file in `src/main/resources/META-INF/native-image/<group-id>/<artifact-id>/`.
+
+**⚠️ Important:** While Quarkus automatically includes resources in `META-INF/resources` as static web content, this directory is for public web resources and should not be used as a shortcut to include all resources in the native image.
+
+---
+
+### 5. What are some key `quarkus.native` configuration properties for optimizing the build?
+
+**Answer:** Several properties in `application.properties` can control the native build process.
+
+*   **`quarkus.native.native-image-xmx`**: Sets the maximum heap size for the native-image build process. This is crucial, as building a native image is memory-intensive.
+*   **`quarkus.native.additional-build-args`**: Allows passing additional arguments directly to the `native-image` tool (e.g., `--gc=G1`, `-O3`).
+*   **`quarkus.native.resources.includes` / `.excludes`**: Controls which resources are bundled into the image.
+*   **`quarkus.native.enable-http-url-handler` / `enable-https-url-handler`**: Explicitly enables support for `URL.openConnection()` for HTTP/HTTPS URLs.
+*   **`quarkus.native.auto-service-loader-registration`**: Automatically registers all `META-INF/services` entries.
+*   **`quarkus.native.container-build`**: Builds the native image inside a container, ensuring a consistent build environment.
+
+---
+
+### 6. What is Profile-Guided Optimization (PGO) for Quarkus Native Images?
+
+**Answer:** Profile-Guided Optimization (PGO) is a compiler technique that uses runtime profiling data to create a more optimized native binary. It involves a two-phase build process:
+
+1.  **Instrumented Build**: Quarkus builds a native image that contains profiling instrumentation, which records information about which code paths are "hot" as it runs.
+2.  **Training Run**: Your existing integration tests (`@QuarkusIntegrationTest`) run against the instrumented binary, generating a profile.
+3.  **Optimized Build**: Quarkus automatically rebuilds the native image using the collected profile data.
+
+The result is a binary optimized for your application's actual behavior. Starting with Quarkus 3.35, enabling PGO is as simple as setting one property:
+
+```properties
+quarkus.native.pgo.enabled=true
+```
+
+Then build with `./mvnw verify -Dnative -Dquarkus.native.pgo.enabled=true`.
+
+**⚠️ Note**: PGO requires **Oracle GraalVM**. Community builds like Mandrel do not include PGO support.
+
+---
+
+### 7. How do you test and validate a Quarkus Native Image?
+
+**Answer:** The recommended way to test a native image is by using **`@QuarkusIntegrationTest`**. This annotation runs your test suite against the final, packaged artifact (the native executable), which is a black-box test【18†L2】.
+
+**Best practices for native testing:**
+*   Reuse JVM test logic by extending `@QuarkusTest` classes.
+*   Run native tests regularly in your CI/CD pipeline with `./mvnw verify -Pnative`.
+*   Be mindful of the default 60-second startup timeout, configurable via `quarkus.test.native-image-wait-time`.
+
+---
+
+### 8. What are the common pitfalls when building Native Images?
+
+**Answer:**
+*   **Ignoring Reflection**: Forgetting to use `@RegisterForReflection` for classes accessed via reflection is the most common cause of `ClassNotFoundException` at runtime.
+*   **Missing Resources**: Failing to include classpath resources leads to `FileNotFoundException` or `NullPointerException`.
+*   **Assuming All JDK Features Work**: Some JDK features are not fully supported; you must ensure your code is GraalVM-compatible.
+*   **Long Build Times**: Native image builds take significantly longer than JVM builds. Use incremental builds and consider the trade-off between build time and runtime performance.
+*   **Using Non-Oracle GraalVM for PGO**: As mentioned, PGO requires Oracle GraalVM. Trying to use it with Mandrel will result in a build failure.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Concept | Key Points |
+| :--- | :--- |
+| **Challenge** | GraalVM's "closed-world assumption" removes unreachable code, breaking reflection/resource loading. |
+| **Reflection** | Register classes with `@RegisterForReflection`. |
+| **Resources** | Include via `quarkus.native.resources.includes` or a `resource-config.json` file. |
+| **Performance** | `quarkus.native.native-image-xmx` controls build memory; PGO optimizes runtime performance. |
+| **Testing** | `@QuarkusIntegrationTest` tests the final artifact【18†L2】. |
+| **Pitfalls** | Forgetting reflection/resource registration, assuming all JDK features work. |

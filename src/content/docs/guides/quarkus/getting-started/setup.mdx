@@ -1,0 +1,164 @@
+---
+title: Project Setup & Bootstrapping
+description: How to create and run a new Quarkus project using the CLI, Maven, or code.quarkus.io.
+sidebar:
+  order: 2
+  label: Project Setup
+---
+
+- Creating a project, understanding the structure, running in dev mode.
+
+### 1. What are the ways to create a Quarkus project?
+
+**Answer:**  
+There are three main approaches:
+
+**Option A – Quarkus CLI (recommended):**
+```bash
+# Install CLI (once)
+curl -Ls https://sh.jbang.dev | bash -s - trust add https://repo1.maven.org/maven2/io/quarkus/quarkus-cli/
+curl -Ls https://sh.jbang.dev | bash -s - app install --fresh --force quarkus@quarkusio
+
+# Create project
+quarkus create app com.example:my-app \
+  --extension='rest,hibernate-orm-panache,jdbc-postgresql'
+```
+
+**Option B – Maven plugin:**
+```bash
+mvn io.quarkus.platform:quarkus-maven-plugin:3.9.0:create \
+  -DprojectGroupId=com.example \
+  -DprojectArtifactId=my-app \
+  -Dextensions="rest,hibernate-orm-panache"
+```
+
+**Option C – Web UI:**  
+Visit [code.quarkus.io](https://code.quarkus.io), select extensions, and download a ZIP.
+
+---
+
+### 2. What does the generated project structure look like?
+
+**Answer:**
+```
+my-app/
+├── src/
+│   ├── main/
+│   │   ├── java/com/example/          # Application code
+│   │   │   └── GreetingResource.java  # Sample REST endpoint
+│   │   ├── resources/
+│   │   │   ├── application.properties # All configuration here
+│   │   │   └── META-INF/resources/    # Static files (index.html, etc.)
+│   │   └── docker/                    # Dockerfiles (JVM + native)
+│   └── test/
+│       └── java/com/example/          # Tests
+├── pom.xml                            # Maven build
+└── .mvn/                              # Maven wrapper
+```
+
+Key files:
+- **`application.properties`** – Single config file for all settings (DB, HTTP port, etc.).
+- **`pom.xml`** – Declares the `quarkus-bom` (bill of materials) — no version management needed per extension.
+
+---
+
+### 3. How do you run a Quarkus application in development mode?
+
+**Answer:**  
+```bash
+quarkus dev
+# or
+./mvnw quarkus:dev
+```
+
+Dev mode provides:
+- **Live reload** – Changes to Java, config, and templates are picked up automatically without restart.
+- **Dev UI** – Available at `http://localhost:8080/q/dev` — shows all extensions, config, endpoints, and more.
+- **Continuous testing** – Tests run in the background on file save.
+- **Dev Services** – Automatically starts Docker containers for databases, Kafka, etc. — zero config needed in dev.
+
+---
+
+### 4. What are Dev Services and how do they help?
+
+**Answer:**  
+**Dev Services** automatically spin up external dependencies (databases, Kafka, Redis, etc.) using **Testcontainers** when you run `quarkus dev` — without any configuration.
+
+For example, if you add `quarkus-jdbc-postgresql` but don't configure `quarkus.datasource.jdbc.url`, Quarkus starts a **PostgreSQL Docker container** and wires it automatically.
+
+**Requirements:**
+- Docker must be running.
+- No `quarkus.datasource.jdbc.url` set (absence triggers Dev Services).
+
+```properties
+# Dev Services kicks in automatically — no config needed in dev
+# For production, set explicitly:
+%prod.quarkus.datasource.jdbc.url=jdbc:postgresql://prod-host:5432/mydb
+```
+
+---
+
+### 5. What is the `application.properties` profile system?
+
+**Answer:**  
+Quarkus uses **named profiles** to manage config per environment. The default profiles are:
+
+| Profile | Activates when |
+| :--- | :--- |
+| `dev` | Running `quarkus dev` |
+| `test` | Running tests |
+| `prod` | Building the final artifact |
+
+Prefix any property with `%profile.` to scope it:
+```properties
+# Active in all profiles
+quarkus.http.port=8080
+
+# Only in prod
+%prod.quarkus.datasource.jdbc.url=jdbc:postgresql://prod:5432/db
+%prod.quarkus.log.level=WARN
+
+# Only in dev
+%dev.quarkus.log.level=DEBUG
+```
+
+---
+
+### 6. How do you build and run a Quarkus application for production?
+
+**Answer:**
+
+**JVM build (fast build, standard JVM):**
+```bash
+./mvnw package
+java -jar target/quarkus-app/quarkus-run.jar
+```
+
+**Native build (slow build, fast startup):**
+```bash
+./mvnw package -Dnative
+# or using a container build (no local GraalVM needed):
+./mvnw package -Dnative -Dquarkus.native.container-build=true
+./target/my-app-1.0-runner
+```
+
+**Docker image:**
+```bash
+# JVM
+docker build -f src/main/docker/Dockerfile.jvm -t my-app:jvm .
+# Native
+docker build -f src/main/docker/Dockerfile.native -t my-app:native .
+```
+
+---
+
+### Summary Table
+
+| Task | Command |
+| :--- | :--- |
+| Create project | `quarkus create app com.example:my-app` |
+| Run in dev mode | `quarkus dev` |
+| Add extension | `quarkus ext add <name>` |
+| Build JVM jar | `./mvnw package` |
+| Build native | `./mvnw package -Dnative` |
+| Open Dev UI | `http://localhost:8080/q/dev` |

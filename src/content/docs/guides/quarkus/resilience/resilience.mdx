@@ -1,0 +1,378 @@
+---
+title: Bulkhead & Circuit Breaker Patterns
+description: Guides on Quarkus resilience including fault tolerance, retry, circuit breaker, and bulkhead.
+sidebar:
+  order: 2
+  label: Bulkhead & Circuit Breaker Patterns
+---
+
+- Preventing cascading failures and limiting concurrent calls to downstream services.
+
+### 1. What are the Bulkhead and Circuit Breaker patterns, and how do they differ?
+
+**Answer:**
+
+| Pattern | Purpose | State | Prevention |
+| :--- | :--- | :--- | :--- |
+| **Bulkhead** | Limits the number of concurrent calls to a service to prevent resource exhaustion (e.g., thread pools, DB connections). | Stateless (no state machine). | Prevents overloading by restricting concurrency. |
+| **Circuit Breaker** | Prevents cascading failures by stopping calls to a failing service. | Stateful (CLOSED → OPEN → HALF_OPEN). | Prevents repeated failures by failing fast when the circuit is OPEN. |
+
+**Together:** Bulkhead protects resources; Circuit Breaker protects the system from repeated failures.
+
+---
+
+### 2. How do you add Fault Tolerance extensions to a Quarkus project to use Bulkhead & Circuit Breaker?
+
+**Answer:** Add the `quarkus-smallrye-fault-tolerance` extension:
+
+```bash
+quarkus ext add smallrye-fault-tolerance
+```
+Or in Maven:
+```xml
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
+</dependency>
+```
+This extension provides all annotations: `@Bulkhead`, `@CircuitBreaker`, `@Retry`, `@Timeout`, `@Fallback`.
+
+---
+
+### 3. What are the two types of Bulkhead supported by SmallRye Fault Tolerance?
+
+**Answer:**
+
+1. **Semaphore Bulkhead** (default) – Limits the number of concurrent invocations on the same thread. Works with both blocking and reactive (`Uni`/`Multi`) methods. Uses a semaphore to control access.
+2. **Thread Pool Bulkhead** – Executes the method in a separate thread pool. Not recommended with reactive programming because it blocks the event loop and can cause thread starvation.
+
+**Recommendation:** Always use semaphore bulkhead in Quarkus reactive applications. Thread pool bulkhead is deprecated in recent versions.
+
+---
+
+### 4. How do you implement a Bulkhead on a REST client method?
+
+**Answer:** Use `@Bulkhead` on the client interface or service method:
+
+```java
+@Path("/api/users")
+@RegisterRestClient(configKey = "user-api")
+public interface UserClient {
+    @GET
+    @Path("/{id}")
+    @Bulkhead(value = 5, waitingTaskQueue = 10) // semaphore bulkhead
+    Uni<User> getUser(@PathParam("id") Long id);
+}
+```
+
+- **`value`** – Maximum number of concurrent calls allowed (default: 10).
+- **`waitingTaskQueue`** – Maximum number of queued requests allowed (default: 0). If exceeded, a `BulkheadException` is thrown.
+
+**Semaphore behavior:** When a call arrives:
+- If active calls < `value`, it proceeds.
+- If active calls >= `value` and queue < `waitingTaskQueue`, it waits.
+- If queue is full, it fails immediately.
+
+---
+
+### 5. What is the Circuit Breaker pattern and its three states?
+
+**Answer:** The Circuit Breaker prevents repeated calls to a failing service, giving it time to recover. It has three states:
+
+- **CLOSED** – Normal operation. Calls are allowed. If failures exceed a threshold, the circuit trips to OPEN.
+- **OPEN** – All calls fail immediately (without invoking the target) for a specified duration (`delay`). This prevents further load on the failing service.
+- **HALF_OPEN** – After the `delay` period, a limited number of test calls are allowed. If they succeed, the circuit closes (returns to CLOSED). If they fail, it reopens.
+
+---
+
+### 6. How do you configure a Circuit Breaker on a service method?
+
+**Answer:** Use `@CircuitBreaker` with parameters:
+
+```java
+@CircuitBreaker(
+    requestVolumeThreshold = 20,    // minimum calls in rolling window
+    failureRatio = 0.5,             // 50% failure rate trips the circuit
+    delay = 5000,                   // 5 seconds in OPEN state
+    successThreshold = 2            // 2 consecutive successes to close
+)
+Uni<User> getUser(Long id);
+```
+
+| Parameter | Description | Default |
+| :--- | :--- | :--- |
+| `requestVolumeThreshold` | Minimum number of calls in the rolling window to consider failure ratio. | 0 (not set) |
+| `failureRatio` | Failure rate (0.0 to 1.0) that opens the circuit. | 1.0 |
+| `delay` | Time the circuit stays OPEN before entering HALF_OPEN (milliseconds). | 5000 |
+| `delayUnit` | Time unit for `delay`. | `MILLISECONDS` |
+| `successThreshold` | Consecutive successes in HALF_OPEN to close the circuit. | 1 |
+
+---
+
+### 7. Can you combine `@Bulkhead` and `@CircuitBreaker` on the same method? What is the execution order?
+
+**Answer:** Yes. The execution order is:
+
+1. **`@Bulkhead`** – Checks if there is capacity. If no capacity, fails immediately.
+2. **`@CircuitBreaker`** – Checks if the circuit is OPEN. If OPEN, fails immediately with `CircuitBreakerOpenException`.
+3. **Method invocation** – If both pass, the actual method is called.
+
+```java
+@Bulkhead(value = 5)
+@CircuitBreaker(failureRatio = 0.5, requestVolumeThreshold = 10)
+public Uni<User> getUser(Long id) { ... }
+```
+
+If the bulkhead is saturated, the circuit breaker is not even consulted.
+
+---
+
+### 8. How do Bulkhead and Circuit Breaker work with reactive types (`Uni`/`Multi`)?
+
+**Answer:** SmallRye Fault Tolerance handles reactive types natively.
+
+- **Bulkhead (semaphore)** – Counts the number of active `Uni`/`Multi` subscriptions. The semaphore is acquired when the method is called and released when the `Uni` completes (success or failure) or when the `Multi` is canceled.
+- **Circuit Breaker** – Counts successes and failures of the `Uni`/`Multi`. A failure is any exception emitted by the `Uni`/`Multi`. If the stream emits items and then fails, the failure counts. If the stream is canceled, it's not counted.
+
+**Important:** The circuit breaker state is maintained per method instance (per CDI bean, not per request).
+
+---
+
+### 9. How do you handle `BulkheadException` and `CircuitBreakerOpenException` gracefully?
+
+**Answer:** Use `.onFailure()` recovery in the reactive pipeline or a `@Fallback` method.
+
+**Using `@Fallback`:**
+```java
+@Bulkhead(value = 5)
+@CircuitBreaker(failureRatio = 0.5, requestVolumeThreshold = 10)
+@Fallback(fallbackMethod = "fallbackUser")
+public Uni<User> getUser(Long id) { ... }
+
+public Uni<User> fallbackUser(Long id) {
+    return Uni.createFrom().item(new User("Fallback"));
+}
+```
+
+**Using pipeline recovery:**
+```java
+public Uni<Response> getUserResponse(Long id) {
+    return userService.getUser(id)
+        .map(Response::ok)
+        .onFailure(BulkheadException.class)
+        .recoverWithItem(Response.status(503).entity("Too many concurrent requests").build())
+        .onFailure(CircuitBreakerOpenException.class)
+        .recoverWithItem(Response.status(503).entity("Service temporarily unavailable").build());
+}
+```
+
+---
+
+### 10. How do you test Bulkhead and Circuit Breaker behaviors in Quarkus?
+
+**Answer:** Use `@QuarkusTest` with controlled concurrency and failures.
+
+**Testing Bulkhead:**
+```java
+@QuarkusTest
+public class BulkheadTest {
+    @Inject
+    UserService service;
+
+    @Test
+    public void testBulkheadLimit() throws Exception {
+        // Simulate 10 concurrent calls, but bulkhead allows only 5
+        List<Uni<User>> calls = IntStream.range(0, 10)
+            .mapToObj(i -> service.getUser(1L))
+            .collect(Collectors.toList());
+
+        // Combine all Unis and await
+        List<User> results = Uni.combine().all().unis(calls)
+            .with(Collectors.collectingAndThen(Collectors.toList(), list -> list))
+            .await().atMost(Duration.ofSeconds(10));
+
+        // Some calls will fail with BulkheadException; count them
+        long failures = results.stream().filter(user -> user == null).count();
+        assertTrue(failures > 0);
+    }
+}
+```
+
+**Testing Circuit Breaker:**
+```java
+@Test
+public void testCircuitBreakerTrips() {
+    // Simulate 10 failures (failure ratio 0.5, threshold 10 -> trips)
+    for (int i = 0; i < 10; i++) {
+        assertThrows(ServiceException.class,
+            () -> service.getUser(1L).await().indefinitely());
+    }
+
+    // Next call should fail fast with CircuitBreakerOpenException
+    assertThrows(CircuitBreakerOpenException.class,
+        () -> service.getUser(1L).await().indefinitely());
+}
+```
+
+---
+
+### 11. What is the relationship between `@CircuitBreaker` and `@Retry`?
+
+**Answer:** They work together, but their execution order matters:
+
+- **`@Retry`** is invoked **before** the circuit breaker checks the state? Actually, the order is: Bulkhead → CircuitBreaker → Timeout → Retry → Fallback. So the circuit breaker is checked **before** retries. If the circuit is OPEN, `Retry` is not attempted at all – it fails immediately. If the circuit is CLOSED, the method is called, and if it fails, `@Retry` may retry. If after retries it still fails, the circuit breaker may open based on its failure ratio.
+
+**Combining them:**
+```java
+@Retry(maxRetries = 3)
+@CircuitBreaker(failureRatio = 0.5, requestVolumeThreshold = 10)
+public Uni<User> getUser(Long id) { ... }
+```
+
+If the circuit is CLOSED, the method is called with retries. If all retries fail, that counts as one failure for the circuit breaker. If the circuit is OPEN, `@Retry` is bypassed.
+
+---
+
+### 12. Can you configure Bulkhead and Circuit Breaker via `application.properties` instead of annotations?
+
+**Answer:** Yes, you can externalize configuration using the MicroProfile Config prefix:
+`{fullyQualifiedClassName}/{methodName}/{policy}/...`
+
+**Example:**
+```properties
+# For method getUser in com.example.UserService
+com.example.UserService/getUser/Bulkhead/value=5
+com.example.UserService/getUser/Bulkhead/waitingTaskQueue=10
+com.example.UserService/getUser/CircuitBreaker/failureRatio=0.3
+com.example.UserService/getUser/CircuitBreaker/requestVolumeThreshold=15
+```
+
+Configuration overrides annotation values, allowing runtime tuning without recompilation.
+
+---
+
+### 13. How does the Circuit Breaker behave when the target method returns a `Multi` stream?
+
+**Answer:** The circuit breaker treats the entire `Multi` as a single operation.
+
+- **Success** – If the `Multi` emits all items without an error, it's counted as a success.
+- **Failure** – If the `Multi` emits an error at any point, it's counted as a failure.
+- **Cancellation** – If the consumer cancels the subscription, it's not counted.
+
+**Implication:** A long-running stream that fails halfway will count as a failure and contribute to opening the circuit. This can be problematic if streams are large; consider using smaller chunks or separate circuit breakers for each chunk.
+
+---
+
+### 14. What is the impact of the `delay` parameter in Circuit Breaker on the overall system?
+
+**Answer:** The `delay` parameter specifies how long the circuit stays OPEN before transitioning to HALF_OPEN.
+
+- **Short delay** – Recovers quickly but may reopen frequently if the service is still unhealthy.
+- **Long delay** – Reduces load on the failing service but increases downtime.
+
+**Best practice:** Set `delay` based on expected recovery time of the downstream service. Use jitter and backoff for distributed systems.
+
+---
+
+### 15. How does `@Bulkhead` with `waitingTaskQueue` behave under heavy load?
+
+**Answer:** The `waitingTaskQueue` allows pending requests to queue if the maximum concurrency is reached. If the queue fills up, new requests fail immediately with `BulkheadException`.
+
+- **`waitingTaskQueue = 0` (default)** – No queuing; requests fail immediately if max concurrency is reached.
+- **`waitingTaskQueue > 0`** – Requests are queued; they wait for an available slot. This can lead to increased latency but prevents immediate rejection.
+
+**Trade-off:** Queuing can hide problems (like slow downstream) and cause timeouts. Use it carefully.
+
+---
+
+### 16. Can you apply Bulkhead and Circuit Breaker to database access methods?
+
+**Answer:** Yes, you can apply them to any CDI bean method, including repository methods. For example, limiting concurrent database queries to prevent connection pool exhaustion:
+
+```java
+@ApplicationScoped
+public class UserRepository {
+    @Bulkhead(value = 10) // limit concurrent queries
+    @CircuitBreaker(failureRatio = 0.2, requestVolumeThreshold = 20)
+    public Uni<List<User>> findAll() {
+        return User.listAll();
+    }
+}
+```
+
+This ensures that if the database is slow, you don't overwhelm it with too many parallel queries.
+
+---
+
+### 17. How do you handle metrics for Bulkhead and Circuit Breaker?
+
+**Answer:** The `quarkus-smallrye-fault-tolerance` extension automatically exposes metrics via Micrometer (if `quarkus-micrometer` is present). Metrics include:
+
+- `ft.<class>.<method>.bulkhead.concurrent.calls` – current active calls.
+- `ft.<class>.<method>.bulkhead.queued.calls` – current queued calls.
+- `ft.<class>.<method>.circuitbreaker.state` – state (0=CLOSED, 1=OPEN, 2=HALF_OPEN).
+- `ft.<class>.<method>.circuitbreaker.failed` – total failures.
+
+You can also add custom metrics using `MeterRegistry`.
+
+---
+
+### 18. What are the common pitfalls with Bulkhead and Circuit Breaker in Quarkus?
+
+**Answer:**
+
+- **Misconfigured thresholds** – Setting `failureRatio` too low or `requestVolumeThreshold` too high can trip the circuit prematurely or not at all.
+- **Reactive thread blocking** – Using thread pool bulkhead (deprecated) with reactive code can block the event loop. Always use semaphore bulkhead.
+- **State not shared across instances** – The circuit breaker state is in‑memory per application instance. In a clustered environment, state is not shared. Consider external solutions (e.g., Redis, Resilience4j with distributed state) for true distributed resilience.
+- **Ignoring `BulkheadException` and `CircuitBreakerOpenException`** – Not recovering from these can result in 500 errors. Always handle them.
+- **Too small `value` on Bulkhead** – Can cause unnecessary rejections. Monitor and tune based on expected concurrency.
+- **Circuit breaker on non-idempotent operations** – If the circuit is OPEN, clients get immediate failures, which is okay for read-heavy operations. For writes, consider using fallback or compensating actions.
+
+---
+
+### 19. How does Circuit Breaker integrate with the Reactive REST Client?
+
+**Answer:** You can apply `@CircuitBreaker` directly on the REST client interface methods, or on the service method that calls the client.
+
+**Example on client:**
+```java
+@Path("/api/users")
+@RegisterRestClient(configKey = "user-api")
+public interface UserClient {
+    @GET
+    @Path("/{id}")
+    @CircuitBreaker(failureRatio = 0.5, requestVolumeThreshold = 10)
+    Uni<User> getUser(@PathParam("id") Long id);
+}
+```
+
+When the client call fails (e.g., HTTP 500), it counts as a failure. The circuit breaker will open if the failure ratio is reached, and subsequent calls to the client will fail fast without making the HTTP call.
+
+---
+
+### 20. What is the recommended strategy for setting Bulkhead and Circuit Breaker parameters in production?
+
+**Answer:**
+
+- **Start with defaults** – Use the defaults (Bulkhead: `value=10`, `waitingTaskQueue=0`; CircuitBreaker: `failureRatio=1.0`, `requestVolumeThreshold=20`, `delay=5000`). Then tune based on load tests and real metrics.
+- **Monitor metrics** – Use Micrometer/Prometheus to observe:
+  - Bulkhead: active calls, queued calls, rejected calls.
+  - CircuitBreaker: state transitions, success/failure rates.
+- **Adjust based on downstream capacity** – If the downstream can handle `N` concurrent requests, set Bulkhead `value` to `N * number_of_instances / 2` to leave room for headroom.
+- **Set `failureRatio` based on tolerance** – For critical services, use a lower ratio (e.g., 0.2) to open earlier. For less critical, use 0.5.
+- **Set `requestVolumeThreshold` high enough** – To avoid opening on random failures, set it to at least 10-20 requests.
+- **Set `delay` based on recovery time** – If the service recovers in seconds, set a short delay (e.g., 5s). If it's a database that may need minutes, use longer delays.
+- **Use `@Fallback`** – Always provide a fallback to degrade gracefully.
+
+---
+
+### Summary Table for Quick Interview Recall
+
+| Pattern | Annotation | Key Parameters | Defaults |
+| :--- | :--- | :--- | :--- |
+| **Bulkhead** | `@Bulkhead` | `value`, `waitingTaskQueue` | `value=10`, `waitingTaskQueue=0` |
+| **Circuit Breaker** | `@CircuitBreaker` | `failureRatio`, `requestVolumeThreshold`, `delay`, `successThreshold` | `failureRatio=1.0`, `requestVolumeThreshold=0`, `delay=5000`, `successThreshold=1` |
+| **Semaphore vs Thread Pool** | Semaphore recommended for reactive | Thread pool deprecated | Semaphore default |
+| **Execution order** | Bulkhead → CircuitBreaker → Timeout → Retry → Fallback | | |
+| **Testing** | Use `@QuarkusTest` with controlled concurrency and mocks | | |
+| **Metrics** | Automatically exposed via Micrometer | | |
